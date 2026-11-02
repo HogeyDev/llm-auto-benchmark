@@ -6,12 +6,24 @@ JavaScript — no framework, no bundler, no server — deployed to GitHub Pages 
 - Live: <https://seandolan0.github.io/llm-auto-benchmark/>
 - Harness and method: see the [root README](../README.md)
 
+## Multi-Track Rankings & Profiles
+
+The leaderboard supports three distinct evaluation tracks:
+1. **General Intelligence (Composite SLM-Index)**: Balanced performance across Reasoning (25%), Coding (30%), Instruction Following (25%), and Agentic Tool Use (20%), with Wilson 95% confidence intervals.
+2. **Coding & Agentic Index**: Weighted benchmark tracking code execution (EvalPlus/HumanEval) and tool-calling execution (BFCL V4 / multi-turn function calling).
+3. **Local Efficiency Index**: Score-per-GB memory footprint and generation throughput (TPS) reflecting true consumer hardware viability.
+
+Submissions are categorized by standardized evaluation profile:
+- `quick`: 4 core tasks, 5 samples each (rapid sanity and smoke testing)
+- `standard`: 8 comprehensive benchmarks (MMLU-Pro, GSM8K, EvalPlus, BFCL, IFEval, CoT)
+- `extended`: 15 research-grade benchmarks (GPQA Diamond, BBH, MATH-500, LiveCodeBench, IFBench, RULER 8k context, HarmBench, XSTest)
+
 ## How it loads data
 
 1. It requests `data/leaderboard.json`, the aggregate built by `scripts/aggregate.py`.
 2. If that is unavailable, it reads `data/results/index.json` and fetches each result file.
 3. If both fail — for example when `index.html` is opened from disk and `fetch()` is blocked — it
-   falls back to a dataset embedded in `app.js` so the table, charts, and inspector still work.
+   falls back to an embedded dataset in `app.js` so the table, multi-track filters, charts, and inspector still work.
 
 ## Add a result
 

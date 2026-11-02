@@ -22,38 +22,53 @@ Two things that meet at a JSON file:
 A result is not accepted by uploading it to a service. It is a pull request against
 `Website/data/results/`. CI checks the schema; a merge republishes the board.
 
-## The tests
+## The tests & evaluation profiles
 
-| Column | What it asks | Metric |
+The test harness provides both rapid smoke testing and full academic/specialist benchmark suites organized by evaluation profile:
+
+* **`quick`**: 4 fast core tests with minimal sample limit for smoke testing and local validation.
+* **`standard`** (default): core general intelligence suite combining fast tests with MMLU-Pro, GSM8K, EvalPlus, and BFCL.
+* **`extended`**: comprehensive evaluation across all 15 benchmark suites including GPQA, BBH, MATH-500, LiveCodeBench, IFBench, RULER, and Safety.
+
+To list all available benchmarks and profiles:
+```bash
+slm-bench list-benchmarks
+```
+
+### Benchmark Tasks Catalog
+
+| Category | Benchmark Tasks | Metric & Capability |
 |:--|:--|:--|
-| **Math** | Multi-step word problems; does the model land on the right number? | strict answer match |
-| **Code** | Can it write a Python function that satisfies a docstring and passes tests? | pass@1 |
-| **ARC** | Science and logic questions with one correct answer. | accuracy |
-| **Format** | Can it obey countable constraints — bullet counts, JSON shape, negative rules? | constraints met |
-| **Tools** | Can it pick the right function from a catalog and fill the arguments correctly? | schema-valid calls |
-
-The bundled harness is deliberately fast: each category runs a small built-in evaluation set, not
-the full public benchmark. Results submitted with the full datasets are welcome — the schema only
-cares that scores, sample counts, and hardware are real.
+| **Reasoning & Math** | **GSM8K**, **MATH-500**, **MMLU-Pro**, **GPQA Diamond**, **BBH**, `slm_reasoning_cot` | Multi-step word math, competition algebra/number theory, 10-choice professional reasoning, PhD science deduction, and algorithmic logic. |
+| **Coding** | **EvalPlus** (HumanEval+ / MBPP+), **LiveCodeBench**, `slm_coding_agent` | Extended 80x edge-case Python function synthesis, post-cutoff competitive programming, and self-repair. |
+| **Instruction Following** | **IFEval**, **IFBench**, `slm_instruction_ifeval` | Verifiable countable constraints, JSON structure adherence, and 2-turn dynamic constraint updates. |
+| **Tool Calling & Agents** | **BFCL V4**, `slm_tool_calling_multiturn` | Catalog selection, strict parameter schema typing, multi-turn tool output synthesis, and negative refusal detection. |
+| **Long Context** | **RULER** (`ruler_context`) | Effective context length testing (needle-in-a-haystack, multi-hop retrieval, variable tracking). |
+| **Safety & Reliability** | **HarmBench** & **XSTest** (`safety_reliability`) | Adversarial jailbreak refusal accuracy vs. false refusal avoidance. |
 
 ## How the score works
 
-The overall figure shown in the ledger is the `overall` value stored in the result file. If a file
-carries only per-test scores, the aggregator computes:
+Results are scored and grouped across three distinct leaderboard tracks:
 
-```text
-overall = 0.25·math + 0.25·code + 0.20·arc + 0.15·instruction + 0.15·tools
+1. **General Intelligence (`slm_index`)**:
+   Weighted blend of core capability pillars:
+   ```text
+   reasoning 25%   coding 30%   instruction 25%   tool_calling 20%
+   ```
+2. **Coding & Agentic Index (`coding_agentic_index`)**:
+   Specialist score combining code generation, unit-test fulfillment, function calling, and multi-turn tool synthesis.
+3. **Local Hardware Efficiency**:
+   Inference decode tokens/sec, memory footprint (VRAM/RAM), and normalized **Score-per-GB** efficiency.
+
+Every metric computes **Wilson 95% confidence intervals** to distinguish genuine model differences from sample variance.
+
+### Quantization Tradeoff Analysis
+
+Compare capability retention and VRAM/RAM savings between model quantizations (e.g. BF16 vs Q4):
+
+```bash
+slm-bench compare-quantization --baseline results/Model-BF16.json --quantized results/Model-Q4.json
 ```
-
-Inside the harness, results are grouped into four categories and written as `slm_index`:
-
-```text
-reasoning 25%   coding 30%   instruction 25%   tool_calling 20%
-```
-
-Those are two different things. The harness composite is what the CLI writes; the five-column
-formula is the site's fallback for hand-built result files. The site never recomputes a score that
-is already present.
 
 ## What "runs locally" means here
 

@@ -37,8 +37,9 @@
         <h1>Local LLM Performance Leaderboard</h1>
         <p class="lede">
           Empirical benchmark rankings, memory footprints, and generation speeds for open-weight models
-          evaluated on consumer GPUs, Apple Silicon, and system RAM. Every result includes verified
-          hardware specifications and test logs.
+          evaluated on consumer GPUs, Apple Silicon, and system RAM. Featuring multi-track rankings
+          (General Intelligence, Coding &amp; Agentic, Local Efficiency), standardized profiles (quick, standard, extended),
+          and hardware telemetry.
         </p>
         <div class="hero-actions">
           <a href="#ledger" class="btn btn--primary">View Leaderboard</a>
@@ -48,32 +49,36 @@
 
       <aside class="method-card" id="method" aria-labelledby="method-title">
         <div class="method-head">
-          <span id="method-title">Benchmark Suites</span>
-          <span>Weight</span>
+          <span id="method-title">Leaderboard Tracks</span>
+          <span>Core Focus</span>
         </div>
         <div class="method-row">
-          <div class="method-name">Math<span>GSM8K</span></div>
-          <div class="method-weight">25%</div>
+          <div class="method-name">General Intelligence<span>SLM-Index</span></div>
+          <div class="method-weight">Reasoning &bull; Code &bull; Math &bull; Tools</div>
         </div>
         <div class="method-row">
-          <div class="method-name">Code<span>HumanEval</span></div>
-          <div class="method-weight">25%</div>
+          <div class="method-name">Coding &amp; Agentic<span>60% Code / 40% Tools</span></div>
+          <div class="method-weight">EvalPlus &bull; BFCL &bull; Multi-turn</div>
         </div>
         <div class="method-row">
-          <div class="method-name">Reasoning<span>ARC Challenge</span></div>
-          <div class="method-weight">20%</div>
+          <div class="method-name">Local Efficiency<span>Score per GB RAM</span></div>
+          <div class="method-weight">Footprint &bull; TTFT &bull; Decode TPS</div>
         </div>
-        <div class="method-row">
-          <div class="method-name">Instruction<span>IFEval</span></div>
-          <div class="method-weight">15%</div>
+
+        <div class="method-profile-list">
+          <div class="method-profile-item">
+            <span class="method-profile-name"><span class="tag tag--profile-quick">Quick</span> 4 Tasks</span>
+            <span class="method-profile-desc">Rapid smoke check (5 samples)</span>
+          </div>
+          <div class="method-profile-item">
+            <span class="method-profile-name"><span class="tag tag--profile-standard">Standard</span> 8 Tasks</span>
+            <span class="method-profile-desc">MMLU-Pro &bull; GSM8K &bull; EvalPlus &bull; BFCL</span>
+          </div>
+          <div class="method-profile-item">
+            <span class="method-profile-name"><span class="tag tag--profile-extended">Extended</span> 15 Suites</span>
+            <span class="method-profile-desc">GPQA &bull; MATH-500 &bull; RULER &bull; Safety</span>
+          </div>
         </div>
-        <div class="method-row">
-          <div class="method-name">Tool use<span>Tool Calling</span></div>
-          <div class="method-weight">15%</div>
-        </div>
-        <p class="method-note">
-          Overall score is the weighted composite across all five benchmark suites.
-        </p>
       </aside>
     </section>
 
@@ -82,22 +87,27 @@
       <div class="stat-cell">
         <div class="stat-label">Models Tested</div>
         <div class="stat-value" id="stat-model-count">--</div>
-        <div class="stat-sub">All tiers</div>
+        <div class="stat-sub">Across all tiers</div>
       </div>
       <div class="stat-cell">
-        <div class="stat-label">Top Overall</div>
+        <div class="stat-label">Top General</div>
         <div class="stat-value stat-value--rust" id="stat-top-score">--</div>
         <div class="stat-sub" id="stat-top-model">&mdash;</div>
       </div>
       <div class="stat-cell">
-        <div class="stat-label">Top Coding</div>
+        <div class="stat-label">Top Code &amp; Agent</div>
         <div class="stat-value" id="stat-top-coding">--</div>
         <div class="stat-sub" id="stat-top-coding-model">&mdash;</div>
       </div>
       <div class="stat-cell">
-        <div class="stat-label">Top Math</div>
-        <div class="stat-value" id="stat-top-math">--</div>
-        <div class="stat-sub" id="stat-top-math-model">&mdash;</div>
+        <div class="stat-label">Top Efficiency</div>
+        <div class="stat-value" id="stat-top-efficiency">--</div>
+        <div class="stat-sub" id="stat-top-efficiency-model">&mdash;</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Top Throughput</div>
+        <div class="stat-value" id="stat-top-speed">--</div>
+        <div class="stat-sub" id="stat-top-speed-model">&mdash;</div>
       </div>
     </section>
 
@@ -110,10 +120,18 @@
       <div class="section-body">
         <div class="section-head">
           <h2 class="section-title">Leaderboard</h2>
-          <p class="section-note">Select a model to view hardware details and test logs. Last updated: <span id="last-updated-text">&mdash;</span></p>
+          <p class="section-note">Select a model to view hardware telemetry and test logs. Last updated: <span id="last-updated-text">&mdash;</span></p>
         </div>
 
         <div class="toolbar">
+          <div class="track-pills" role="tablist" aria-label="Leaderboard Tracks">
+            <span class="track-pills-label">Track:</span>
+            <button type="button" class="track-pill is-active" data-track="all">All Metrics</button>
+            <button type="button" class="track-pill" data-track="general">General (SLM-Index)</button>
+            <button type="button" class="track-pill" data-track="coding_agentic">Coding &amp; Agentic</button>
+            <button type="button" class="track-pill" data-track="efficiency">Local Efficiency</button>
+          </div>
+
           <div class="toolbar-top">
             <div class="search">
               <input type="text" id="search-input" placeholder="Search by model, architecture, or license&hellip;" aria-label="Search models">
@@ -139,9 +157,12 @@
               </select>
             </div>
             <div class="field">
-              <label for="license-filter">License</label>
-              <select id="license-filter">
-                <option value="all">All licenses</option>
+              <label for="profile-filter">Profile</label>
+              <select id="profile-filter">
+                <option value="all">All profiles</option>
+                <option value="standard">Standard</option>
+                <option value="quick">Quick</option>
+                <option value="extended">Extended</option>
               </select>
             </div>
             <div class="field">
@@ -152,17 +173,27 @@
                 <option value="GGUF">GGUF (Q4 / Q8)</option>
                 <option value="AWQ">AWQ 4-bit</option>
                 <option value="NF4">bitsandbytes NF4</option>
+                <option value="INT4">INT4</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="license-filter">License</label>
+              <select id="license-filter">
+                <option value="all">All licenses</option>
               </select>
             </div>
             <div class="field">
               <label for="sort-select">Sort by</label>
               <select id="sort-select">
-                <option value="overall_desc">Overall score</option>
+                <option value="overall_desc">General (SLM-Index)</option>
+                <option value="coding_agentic_desc">Coding &amp; Agentic Index</option>
+                <option value="efficiency_desc">Local Efficiency (Score/GB)</option>
+                <option value="speed_desc">Speed (tokens/sec)</option>
                 <option value="gsm8k_desc">Math (GSM8K)</option>
                 <option value="humaneval_desc">Code (HumanEval)</option>
                 <option value="arc_desc">Reasoning (ARC)</option>
                 <option value="ifeval_desc">Instruction (IFEval)</option>
-                <option value="tool_calling_desc">Tool use</option>
+                <option value="tool_calling_desc">Tools (Tool use)</option>
                 <option value="params_asc">Size (smallest first)</option>
                 <option value="params_desc">Size (largest first)</option>
               </select>
@@ -185,15 +216,27 @@
                 </th>
                 <th class="col-model" scope="col" data-sort="name">
                   <span class="th-inner"><span class="th-main">Model</span><span class="sort-mark" id="sort-icon-name">&middot;</span></span>
-                  <span class="th-sub">License &middot; Precision</span>
+                  <span class="th-sub">Precision &middot; Profile</span>
                 </th>
                 <th class="col-params" scope="col" data-sort="params">
                   <span class="th-inner"><span class="th-main">Size</span><span class="sort-mark" id="sort-icon-params">&middot;</span></span>
-                  <span class="th-sub">Parameters</span>
+                  <span class="th-sub">Params &middot; RAM</span>
                 </th>
                 <th class="col-overall" scope="col" data-sort="overall">
                   <span class="th-inner"><span class="th-main">Overall</span><span class="sort-mark is-active" id="sort-icon-overall">&darr;</span></span>
-                  <span class="th-sub">Composite</span>
+                  <span class="th-sub">SLM-Index &middot; 95% CI</span>
+                </th>
+                <th class="col-score track-col-agentic" scope="col" data-sort="coding_agentic">
+                  <span class="th-inner"><span class="th-main">Code &amp; Agent</span><span class="sort-mark" id="sort-icon-coding_agentic">&middot;</span></span>
+                  <span class="th-sub">Index</span>
+                </th>
+                <th class="col-score track-col-efficiency" scope="col" data-sort="efficiency">
+                  <span class="th-inner"><span class="th-main">Score / GB</span><span class="sort-mark" id="sort-icon-efficiency">&middot;</span></span>
+                  <span class="th-sub">Efficiency</span>
+                </th>
+                <th class="col-score" scope="col" data-sort="speed">
+                  <span class="th-inner"><span class="th-main">Speed</span><span class="sort-mark" id="sort-icon-speed">&middot;</span></span>
+                  <span class="th-sub">tok/s</span>
                 </th>
                 <th class="col-score" scope="col" data-sort="gsm8k">
                   <span class="th-inner"><span class="th-main">Math</span><span class="sort-mark" id="sort-icon-gsm8k">&middot;</span></span>
@@ -220,7 +263,7 @@
             </thead>
             <tbody id="table-body">
               <tr>
-                <td colspan="11">
+                <td colspan="14">
                   <div class="empty-state">
                     <strong>Loading benchmarks&hellip;</strong>
                     <span>Fetching results dataset.</span>
@@ -256,11 +299,11 @@
           </figure>
           <figure class="figure" style="margin:0">
             <div class="figure-head">
-              <h3>Score vs. Model Size</h3>
+              <h3>Score vs. Memory Footprint</h3>
             </div>
-            <figcaption class="figure-note">Composite overall score plotted against parameter count.</figcaption>
+            <figcaption class="figure-note">Composite SLM-Index plotted against RAM / VRAM footprint (GB) &mdash; Local Efficiency frontier.</figcaption>
             <div class="figure-canvas">
-              <canvas id="barChart" aria-label="Bar chart of overall score by model size"></canvas>
+              <canvas id="barChart" aria-label="Scatter chart of score against memory footprint"></canvas>
             </div>
           </figure>
         </div>
@@ -300,7 +343,7 @@
                 <span class="step-no">2</span>
                 <div>
                   <strong>Run evaluation</strong>
-                  <p>Supports llama.cpp, vLLM, transformers, or OpenAI-compatible endpoints like Ollama.</p>
+                  <p>Supports llama.cpp, vLLM, transformers, or OpenAI-compatible endpoints with profiles (<code>quick</code>, <code>standard</code>, <code>extended</code>).</p>
                 </div>
               </li>
               <li class="step">
@@ -311,11 +354,12 @@
                 </div>
               </li>
             </ol>
-            <pre class="code" style="margin-top:14px"><span class="c"># Run evaluation against an OpenAI-compatible endpoint</span>
+            <pre class="code" style="margin-top:14px"><span class="c"># Run standard profile against a local endpoint</span>
 slm-bench evaluate \
   --model-id <span class="p">"qwen2.5-coder:7b"</span> \
   --backend openai \
   --endpoint-url <span class="p">"http://localhost:11434/v1"</span> \
+  --profile standard \
   --model-ram-gb 4.8 \
   --notes <span class="p">"RTX 3060 12GB, 33 layers on GPU"</span></pre>
           </div>
@@ -352,8 +396,10 @@ slm-bench evaluate \
           <h3 class="modal-title" id="modal-model-title">Model name</h3>
           <div class="chip-row">
             <span class="chip chip--rust" id="modal-rank-badge">Rank #--</span>
+            <span class="chip" id="modal-profile-badge">Standard</span>
             <span class="chip" id="modal-tier-badge">7B&ndash;14B</span>
             <span class="chip" id="modal-quant-badge">GGUF Q4_K_M</span>
+            <span class="chip hidden" id="modal-effort-badge">Effort: High</span>
           </div>
           <div class="modal-sub">
             <a id="modal-hf-link" href="#" target="_blank" rel="noopener noreferrer">Hugging Face card &#8599;</a>
@@ -365,7 +411,7 @@ slm-bench evaluate \
 
       <div class="tabs">
         <button type="button" class="tab modal-tab-btn is-active" data-tab="tab-overview">Scores</button>
-        <button type="button" class="tab modal-tab-btn" data-tab="tab-hardware">Hardware</button>
+        <button type="button" class="tab modal-tab-btn" data-tab="tab-hardware">Hardware &amp; Telemetry</button>
         <button type="button" class="tab modal-tab-btn" data-tab="tab-logs">Logs</button>
         <button type="button" class="tab modal-tab-btn" data-tab="tab-json">Raw JSON</button>
       </div>
@@ -375,24 +421,32 @@ slm-bench evaluate \
         <div id="tab-overview" class="modal-tab-content">
           <div class="stat-grid">
             <div class="stat-box">
-              <span class="stat-label">Overall</span>
+              <span class="stat-label">General (SLM-Index)</span>
               <div class="stat-value" id="modal-score-overall">--</div>
+              <span class="ci-range" id="modal-ci-range">95% CI: --</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">Code &amp; Agent</span>
+              <div class="stat-value" id="modal-score-agentic">--</div>
+              <span class="ci-range">Coding &amp; Tools</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">Efficiency</span>
+              <div class="stat-value" id="modal-score-efficiency">--</div>
+              <span class="ci-range">Score per GB</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">Throughput</span>
+              <div class="stat-value" id="modal-throughput">--</div>
+              <span class="ci-range">Decode tok/s</span>
             </div>
             <div class="stat-box">
               <span class="stat-label">Parameters</span>
               <div class="stat-value" id="modal-param-count">--</div>
             </div>
             <div class="stat-box">
-              <span class="stat-label">Model in memory</span>
+              <span class="stat-label">Model in Memory</span>
               <div class="stat-value" id="modal-model-ram">--</div>
-            </div>
-            <div class="stat-box">
-              <span class="stat-label">Architecture</span>
-              <div class="stat-value stat-value--small" id="modal-architecture">--</div>
-            </div>
-            <div class="stat-box">
-              <span class="stat-label">License</span>
-              <div class="stat-value stat-value--small" id="modal-license">--</div>
             </div>
           </div>
 
@@ -401,11 +455,14 @@ slm-bench evaluate \
             <p id="modal-notes-text"></p>
           </div>
 
+          <h4 class="subhead">Category Pillars</h4>
+          <div class="category-grid" id="modal-categories-breakdown"></div>
+
           <h4 class="subhead">Test breakdown</h4>
           <div class="task-list" id="modal-tasks-breakdown"></div>
         </div>
 
-        <!-- Hardware -->
+        <!-- Hardware & Telemetry -->
         <div id="tab-hardware" class="modal-tab-content hidden">
           <div class="panel-grid">
             <div class="panel">
@@ -426,6 +483,35 @@ slm-bench evaluate \
                 <div class="def"><dt>System RAM</dt><dd id="modal-hw-ram">N/A</dd></div>
                 <div class="def"><dt>Operating system</dt><dd id="modal-hw-os">N/A</dd></div>
               </dl>
+            </div>
+          </div>
+
+          <h4 class="subhead">Inference Telemetry</h4>
+          <div class="telemetry-grid">
+            <div class="telemetry-card">
+              <span class="telemetry-label">Time to First Token</span>
+              <div class="telemetry-val" id="modal-telemetry-ttft">-- ms</div>
+              <div class="telemetry-sub">Prompt processing</div>
+            </div>
+            <div class="telemetry-card">
+              <span class="telemetry-label">Inter-Token Latency</span>
+              <div class="telemetry-val" id="modal-telemetry-tpot">-- ms</div>
+              <div class="telemetry-sub">Time per output token</div>
+            </div>
+            <div class="telemetry-card">
+              <span class="telemetry-label">Decode Speed</span>
+              <div class="telemetry-val" id="modal-telemetry-tps">-- tok/s</div>
+              <div class="telemetry-sub">Generation throughput</div>
+            </div>
+            <div class="telemetry-card">
+              <span class="telemetry-label">Peak Host RAM</span>
+              <div class="telemetry-val" id="modal-telemetry-ram">-- MB</div>
+              <div class="telemetry-sub">Process memory</div>
+            </div>
+            <div class="telemetry-card">
+              <span class="telemetry-label">Peak GPU VRAM</span>
+              <div class="telemetry-val" id="modal-telemetry-vram">-- MB</div>
+              <div class="telemetry-sub">Allocated device VRAM</div>
             </div>
           </div>
 

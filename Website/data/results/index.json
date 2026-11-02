@@ -1,4 +1,12 @@
 {
-  "count": 0,
-  "files": []
+  "count": 7,
+  "files": [
+    "deepseek-ai_DeepSeek-R1-Distill-Qwen-14B-GGUF_Q4_K_M.json",
+    "Qwen_Qwen2.5-32B-Instruct-GGUF_Q4_K_M.json",
+    "Qwen_Qwen2.5-Coder-7B-Instruct-BF16.json",
+    "microsoft_Phi-3.5-mini-instruct-AWQ_4BIT.json",
+    "meta-llama_Llama-3.2-3B-Instruct-BF16.json",
+    "HuggingFaceTB_SmolLM2-1.7B-Instruct-BF16.json",
+    "Spark-X2.6-4B-INT4-INT4.json"
+  ]
 }

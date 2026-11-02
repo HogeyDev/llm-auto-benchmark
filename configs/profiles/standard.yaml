@@ -1,0 +1,12 @@
+name: "standard"
+description: "Standard comprehensive evaluation profile across core reasoning, coding, and tool capabilities"
+sample_limit: null
+tasks:
+  - "slm_reasoning_cot"
+  - "slm_coding_agent"
+  - "slm_instruction_ifeval"
+  - "slm_tool_calling_multiturn"
+  - "mmlu_pro"
+  - "gsm8k"
+  - "evalplus"
+  - "bfcl"

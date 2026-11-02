@@ -1,12 +1,1242 @@
 {
   "metadata": {
-    "total_models": 0,
-    "last_updated": "2026-11-02T18:30:01.631536+00:00",
-    "highest_overall": 0.0,
-    "best_by_benchmark": {},
-    "unique_architectures": [],
-    "unique_licenses": [],
-    "unique_quantizations": []
+    "total_models": 7,
+    "last_updated": "2026-11-02T22:59:59.306897+00:00",
+    "highest_overall": 87.65,
+    "best_by_benchmark": {
+      "gsm8k": 94.2,
+      "humaneval": 88.4,
+      "arc": 92.4,
+      "ifeval": 85.2,
+      "tool_calling": 100.0
+    },
+    "best_by_track": {
+      "top_overall": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+      "top_overall_score": 87.65,
+      "top_coding_agentic": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+      "top_coding_agentic_score": 84.9,
+      "top_efficiency": "microsoft/Phi-3.5-mini-instruct",
+      "top_efficiency_score": 31.31,
+      "top_throughput": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+      "top_throughput_tps": 112.5
+    },
+    "unique_profiles": [
+      "extended",
+      "quick",
+      "standard"
+    ],
+    "unique_architectures": [
+      "LlamaForCausalLM",
+      "Phi3ForCausalLM",
+      "Qwen2ForCausalLM",
+      "Spark2_5ForCausalLM"
+    ],
+    "unique_licenses": [
+      "Apache-2.0",
+      "Llama 3.2 Community",
+      "MIT",
+      "apache-2.0"
+    ],
+    "unique_quantizations": [
+      "AWQ",
+      "BF16",
+      "GGUF Q4_K_M",
+      "INT4"
+    ]
   },
-  "models": []
+  "models": [
+    {
+      "filename": "deepseek-ai_DeepSeek-R1-Distill-Qwen-14B-GGUF_Q4_K_M.json",
+      "file_path": "data/results/deepseek-ai_DeepSeek-R1-Distill-Qwen-14B-GGUF_Q4_K_M.json",
+      "evaluation_id": "eval-dsk-r1-14b-20261101",
+      "timestamp": "2026-11-01T14:22:10Z",
+      "profile": "extended",
+      "submitter": {
+        "name": "Alex Chen",
+        "github_handle": "alexchen-ai",
+        "affiliation": "Independent ML Researcher"
+      },
+      "model": {
+        "model_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+        "model_slug": "DeepSeek-R1-Distill-Qwen-14B-GGUF_Q4_K_M",
+        "hf_url": "https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+        "param_count_b": 14.7,
+        "param_tier": "7B\u201314B",
+        "architecture": "Qwen2ForCausalLM",
+        "quantization": "GGUF Q4_K_M",
+        "model_ram_gb": 9.2,
+        "context_length": 65536,
+        "license": "MIT",
+        "backend": "llama.cpp",
+        "reasoning_effort": "high"
+      },
+      "scores": {
+        "overall": 87.65,
+        "ci_lower": 85.8,
+        "ci_upper": 89.3,
+        "coding_agentic_index": 84.9,
+        "local_efficiency_score": 85.2,
+        "score_per_gb": 9.53,
+        "gsm8k": 94.2,
+        "humaneval": 86.5,
+        "arc": 92.4,
+        "ifeval": 81.3,
+        "tool_calling": 82.5,
+        "bfcl": 81.2
+      },
+      "hardware": {
+        "gpu_name": "NVIDIA GeForce RTX 4090",
+        "gpu_count": 1,
+        "gpu_vram_gb": 24.0,
+        "cpu": "AMD Ryzen 9 7950X 16-Core Processor",
+        "cpu_cores": 16,
+        "total_ram_gb": 64.0,
+        "model_ram_gb": 9.2,
+        "os": "Ubuntu 24.04 LTS (Linux 6.8.0-generic)",
+        "cuda_version": "12.4",
+        "driver_version": "550.54.14"
+      },
+      "telemetry": {
+        "ttft_ms": 285.4,
+        "decode_tok_per_sec": 48.6,
+        "tpot_ms": 20.57,
+        "peak_ram_mb": 1820.0,
+        "peak_vram_mb": 9420.0
+      },
+      "local_efficiency": {
+        "score_per_gb": 9.53,
+        "throughput_tps": 48.6,
+        "effective_memory_gb": 9.2,
+        "efficiency_score": 85.2
+      },
+      "categories": {
+        "reasoning": {
+          "category": "reasoning",
+          "weight": 0.25,
+          "normalized_score": 92.4,
+          "task_count": 2
+        },
+        "coding": {
+          "category": "coding",
+          "weight": 0.3,
+          "normalized_score": 86.5,
+          "task_count": 2
+        },
+        "instruction": {
+          "category": "instruction",
+          "weight": 0.25,
+          "normalized_score": 81.3,
+          "task_count": 1
+        },
+        "tool_calling": {
+          "category": "tool_calling",
+          "weight": 0.2,
+          "normalized_score": 82.5,
+          "task_count": 2
+        }
+      },
+      "tasks": {
+        "gsm8k": {
+          "task_id": "gsm8k",
+          "category": "reasoning",
+          "normalized_score": 94.2,
+          "raw_score": 0.942,
+          "raw_metric_name": "strict_acc",
+          "total_samples": 1319,
+          "passed_samples": 1242,
+          "ci_lower": 92.8,
+          "ci_upper": 95.4,
+          "avg_tokens_per_sec": 48.6,
+          "avg_latency_ms": 285.4
+        },
+        "humaneval": {
+          "task_id": "humaneval",
+          "category": "coding",
+          "normalized_score": 86.5,
+          "raw_score": 0.865,
+          "raw_metric_name": "pass@1",
+          "total_samples": 164,
+          "passed_samples": 142,
+          "ci_lower": 80.5,
+          "ci_upper": 91.0,
+          "avg_tokens_per_sec": 46.8,
+          "avg_latency_ms": 312.0
+        },
+        "arc": {
+          "task_id": "arc",
+          "category": "reasoning",
+          "normalized_score": 92.4,
+          "raw_score": 0.924,
+          "raw_metric_name": "acc_norm",
+          "total_samples": 1172,
+          "passed_samples": 1083,
+          "ci_lower": 90.7,
+          "ci_upper": 93.8,
+          "avg_tokens_per_sec": 51.2,
+          "avg_latency_ms": 195.0
+        },
+        "ifeval": {
+          "task_id": "ifeval",
+          "category": "instruction",
+          "normalized_score": 81.3,
+          "raw_score": 0.813,
+          "raw_metric_name": "strict_prompt_acc",
+          "total_samples": 541,
+          "passed_samples": 440,
+          "ci_lower": 77.8,
+          "ci_upper": 84.4,
+          "avg_tokens_per_sec": 49.5,
+          "avg_latency_ms": 240.0
+        },
+        "tool_calling": {
+          "task_id": "tool_calling",
+          "category": "tool_calling",
+          "normalized_score": 82.5,
+          "raw_score": 0.825,
+          "raw_metric_name": "schema_and_execution_acc",
+          "total_samples": 300,
+          "passed_samples": 248,
+          "ci_lower": 77.8,
+          "ci_upper": 86.4,
+          "avg_tokens_per_sec": 47.5,
+          "avg_latency_ms": 280.0
+        },
+        "bfcl": {
+          "task_id": "bfcl",
+          "category": "tool_calling",
+          "normalized_score": 81.2,
+          "raw_score": 0.812,
+          "raw_metric_name": "bfcl_ast_match",
+          "total_samples": 200,
+          "passed_samples": 162,
+          "ci_lower": 75.2,
+          "ci_upper": 86.0,
+          "avg_tokens_per_sec": 46.0,
+          "avg_latency_ms": 290.0
+        }
+      },
+      "provenance": {},
+      "notes": "Full GPU offload with llama.cpp FlashAttention-2. Excellent reasoning density per GB VRAM.",
+      "raw_logs_preview": "[2026-11-01 14:00:10] Loaded model weights with 4-bit block quant. Context: 65536 tokens.\n[2026-11-01 14:22:10] Evaluation complete across 6 suites. Composite SLM-Index: 87.65%",
+      "rank": 1
+    },
+    {
+      "filename": "Qwen_Qwen2.5-32B-Instruct-GGUF_Q4_K_M.json",
+      "file_path": "data/results/Qwen_Qwen2.5-32B-Instruct-GGUF_Q4_K_M.json",
+      "evaluation_id": "eval-qwen25-32b-gguf",
+      "timestamp": "2026-10-28T09:30:00Z",
+      "profile": "standard",
+      "submitter": {
+        "name": "Maria Garcia",
+        "github_handle": "mgarcia-research",
+        "affiliation": "Open Weights Alliance"
+      },
+      "model": {
+        "model_id": "Qwen/Qwen2.5-32B-Instruct",
+        "model_slug": "Qwen2.5-32B-Instruct-GGUF_Q4_K_M",
+        "hf_url": "https://huggingface.co/Qwen/Qwen2.5-32B-Instruct",
+        "param_count_b": 32.5,
+        "param_tier": "14B\u201332B",
+        "architecture": "Qwen2ForCausalLM",
+        "quantization": "GGUF Q4_K_M",
+        "model_ram_gb": 19.8,
+        "context_length": 65536,
+        "license": "Apache-2.0",
+        "backend": "llama.cpp",
+        "reasoning_effort": null
+      },
+      "scores": {
+        "overall": 86.9,
+        "ci_lower": 85.2,
+        "ci_upper": 88.4,
+        "coding_agentic_index": 83.44,
+        "local_efficiency_score": 75.6,
+        "score_per_gb": 4.39,
+        "gsm8k": 91.6,
+        "humaneval": 84.8,
+        "arc": 90.1,
+        "ifeval": 85.2,
+        "tool_calling": 81.4
+      },
+      "hardware": {
+        "gpu_name": "NVIDIA GeForce RTX 4090",
+        "gpu_count": 1,
+        "gpu_vram_gb": 24.0,
+        "cpu": "AMD Ryzen 9 7900X",
+        "cpu_cores": 12,
+        "total_ram_gb": 64.0,
+        "model_ram_gb": 19.8,
+        "os": "Ubuntu 24.04 LTS",
+        "cuda_version": "12.4",
+        "driver_version": "550.54"
+      },
+      "telemetry": {
+        "ttft_ms": 340.0,
+        "decode_tok_per_sec": 31.4,
+        "tpot_ms": 31.84,
+        "peak_ram_mb": 2400.0,
+        "peak_vram_mb": 20400.0
+      },
+      "local_efficiency": {
+        "score_per_gb": 4.39,
+        "throughput_tps": 31.4,
+        "effective_memory_gb": 19.8,
+        "efficiency_score": 75.6
+      },
+      "categories": {
+        "reasoning": {
+          "category": "reasoning",
+          "weight": 0.25,
+          "normalized_score": 90.8,
+          "task_count": 2
+        },
+        "coding": {
+          "category": "coding",
+          "weight": 0.3,
+          "normalized_score": 84.8,
+          "task_count": 1
+        },
+        "instruction": {
+          "category": "instruction",
+          "weight": 0.25,
+          "normalized_score": 85.2,
+          "task_count": 1
+        },
+        "tool_calling": {
+          "category": "tool_calling",
+          "weight": 0.2,
+          "normalized_score": 81.4,
+          "task_count": 1
+        }
+      },
+      "tasks": {
+        "gsm8k": {
+          "task_id": "gsm8k",
+          "category": "reasoning",
+          "normalized_score": 91.6,
+          "passed_samples": 1208,
+          "total_samples": 1319,
+          "ci_lower": 89.9,
+          "ci_upper": 93.0,
+          "avg_tokens_per_sec": 31.4
+        },
+        "humaneval": {
+          "task_id": "humaneval",
+          "category": "coding",
+          "normalized_score": 84.8,
+          "passed_samples": 139,
+          "total_samples": 164,
+          "ci_lower": 78.6,
+          "ci_upper": 89.5,
+          "avg_tokens_per_sec": 29.8
+        },
+        "arc": {
+          "task_id": "arc",
+          "category": "reasoning",
+          "normalized_score": 90.1,
+          "passed_samples": 1056,
+          "total_samples": 1172,
+          "ci_lower": 88.2,
+          "ci_upper": 91.7,
+          "avg_tokens_per_sec": 34.2
+        },
+        "ifeval": {
+          "task_id": "ifeval",
+          "category": "instruction",
+          "normalized_score": 85.2,
+          "passed_samples": 461,
+          "total_samples": 541,
+          "ci_lower": 82.0,
+          "ci_upper": 88.0,
+          "avg_tokens_per_sec": 32.0
+        },
+        "tool_calling": {
+          "task_id": "tool_calling",
+          "category": "tool_calling",
+          "normalized_score": 81.4,
+          "passed_samples": 244,
+          "total_samples": 300,
+          "ci_lower": 76.7,
+          "ci_upper": 85.4,
+          "avg_tokens_per_sec": 30.5
+        }
+      },
+      "provenance": {},
+      "notes": "32B parameter model running in 4-bit quant inside 24GB VRAM.",
+      "raw_logs_preview": "[2026-10-28 09:15:30] Full evaluation completed on 5 benchmarks. Average accuracy 86.90%.",
+      "rank": 2
+    },
+    {
+      "filename": "Qwen_Qwen2.5-Coder-7B-Instruct-BF16.json",
+      "file_path": "data/results/Qwen_Qwen2.5-Coder-7B-Instruct-BF16.json",
+      "evaluation_id": "eval-qwen25-coder-7b-bf16",
+      "timestamp": "2026-10-29T18:05:00Z",
+      "profile": "standard",
+      "submitter": {
+        "name": "David Miller",
+        "github_handle": "dmiller-code",
+        "affiliation": "CodeAI Labs"
+      },
+      "model": {
+        "model_id": "Qwen/Qwen2.5-Coder-7B-Instruct",
+        "model_slug": "Qwen2.5-Coder-7B-Instruct-BF16",
+        "hf_url": "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct",
+        "param_count_b": 7.61,
+        "param_tier": "7B\u201314B",
+        "architecture": "Qwen2ForCausalLM",
+        "quantization": "BF16",
+        "model_ram_gb": 15.2,
+        "context_length": 131072,
+        "license": "Apache-2.0",
+        "backend": "vllm",
+        "reasoning_effort": null
+      },
+      "scores": {
+        "overall": 83.55,
+        "ci_lower": 81.9,
+        "ci_upper": 85.1,
+        "coding_agentic_index": 84.84,
+        "local_efficiency_score": 81.3,
+        "score_per_gb": 5.5,
+        "gsm8k": 88.5,
+        "humaneval": 88.4,
+        "arc": 83.2,
+        "ifeval": 78.4,
+        "tool_calling": 79.5
+      },
+      "hardware": {
+        "gpu_name": "NVIDIA GeForce RTX 4080",
+        "gpu_count": 1,
+        "gpu_vram_gb": 16.0,
+        "cpu": "Intel Core i9-14900K",
+        "cpu_cores": 24,
+        "total_ram_gb": 64.0,
+        "model_ram_gb": 15.2,
+        "os": "Ubuntu 24.04 LTS",
+        "cuda_version": "12.4",
+        "driver_version": "550.67"
+      },
+      "telemetry": {
+        "ttft_ms": 190.5,
+        "decode_tok_per_sec": 68.4,
+        "tpot_ms": 14.62,
+        "peak_ram_mb": 2100.0,
+        "peak_vram_mb": 15600.0
+      },
+      "local_efficiency": {
+        "score_per_gb": 5.5,
+        "throughput_tps": 68.4,
+        "effective_memory_gb": 15.2,
+        "efficiency_score": 81.3
+      },
+      "categories": {
+        "reasoning": {
+          "category": "reasoning",
+          "weight": 0.25,
+          "normalized_score": 85.8,
+          "task_count": 2
+        },
+        "coding": {
+          "category": "coding",
+          "weight": 0.3,
+          "normalized_score": 88.4,
+          "task_count": 1
+        },
+        "instruction": {
+          "category": "instruction",
+          "weight": 0.25,
+          "normalized_score": 78.4,
+          "task_count": 1
+        },
+        "tool_calling": {
+          "category": "tool_calling",
+          "weight": 0.2,
+          "normalized_score": 79.5,
+          "task_count": 1
+        }
+      },
+      "tasks": {
+        "gsm8k": {
+          "task_id": "gsm8k",
+          "category": "reasoning",
+          "normalized_score": 88.5,
+          "passed_samples": 1167,
+          "total_samples": 1319,
+          "ci_lower": 86.7,
+          "ci_upper": 90.1,
+          "avg_tokens_per_sec": 68.4
+        },
+        "humaneval": {
+          "task_id": "humaneval",
+          "category": "coding",
+          "normalized_score": 88.4,
+          "passed_samples": 145,
+          "total_samples": 164,
+          "ci_lower": 82.6,
+          "ci_upper": 92.5,
+          "avg_tokens_per_sec": 66.2
+        },
+        "arc": {
+          "task_id": "arc",
+          "category": "reasoning",
+          "normalized_score": 83.2,
+          "passed_samples": 975,
+          "total_samples": 1172,
+          "ci_lower": 80.9,
+          "ci_upper": 85.2,
+          "avg_tokens_per_sec": 71.0
+        },
+        "ifeval": {
+          "task_id": "ifeval",
+          "category": "instruction",
+          "normalized_score": 78.4,
+          "passed_samples": 424,
+          "total_samples": 541,
+          "ci_lower": 74.7,
+          "ci_upper": 81.7,
+          "avg_tokens_per_sec": 67.5
+        },
+        "tool_calling": {
+          "task_id": "tool_calling",
+          "category": "tool_calling",
+          "normalized_score": 79.5,
+          "passed_samples": 239,
+          "total_samples": 300,
+          "ci_lower": 74.6,
+          "ci_upper": 83.7,
+          "avg_tokens_per_sec": 65.0
+        }
+      },
+      "provenance": {},
+      "notes": "Native BF16 run on vLLM with PagedAttention enabled.",
+      "raw_logs_preview": "[2026-10-29 18:00:00] vLLM initialized. 16GB VRAM utilized. Peak throughput 68.4 tok/s.",
+      "rank": 3
+    },
+    {
+      "filename": "microsoft_Phi-3.5-mini-instruct-AWQ_4BIT.json",
+      "file_path": "data/results/microsoft_Phi-3.5-mini-instruct-AWQ_4BIT.json",
+      "evaluation_id": "eval-phi35-mini-awq",
+      "timestamp": "2026-10-18T13:45:00Z",
+      "profile": "standard",
+      "submitter": {
+        "name": "Karthik Subramanian",
+        "github_handle": "ksubramanian-dev",
+        "affiliation": "Edge LLM Benchmarks"
+      },
+      "model": {
+        "model_id": "microsoft/Phi-3.5-mini-instruct",
+        "model_slug": "Phi-3.5-mini-instruct-AWQ_4BIT",
+        "hf_url": "https://huggingface.co/microsoft/Phi-3.5-mini-instruct",
+        "param_count_b": 3.82,
+        "param_tier": "3B\u20137B",
+        "architecture": "Phi3ForCausalLM",
+        "quantization": "AWQ",
+        "model_ram_gb": 2.45,
+        "context_length": 131072,
+        "license": "MIT",
+        "backend": "AutoAWQ",
+        "reasoning_effort": null
+      },
+      "scores": {
+        "overall": 76.7,
+        "ci_lower": 74.9,
+        "ci_upper": 78.4,
+        "coding_agentic_index": 69.66,
+        "local_efficiency_score": 93.4,
+        "score_per_gb": 31.31,
+        "gsm8k": 82.1,
+        "humaneval": 68.9,
+        "arc": 82.4,
+        "ifeval": 77.1,
+        "tool_calling": 70.8
+      },
+      "hardware": {
+        "gpu_name": "NVIDIA GeForce RTX 4060",
+        "gpu_count": 1,
+        "gpu_vram_gb": 8.0,
+        "cpu": "AMD Ryzen 7 7700",
+        "cpu_cores": 8,
+        "total_ram_gb": 32.0,
+        "model_ram_gb": 2.45,
+        "os": "Windows 11 (10.0.22631)",
+        "cuda_version": "12.3",
+        "driver_version": "546.33"
+      },
+      "telemetry": {
+        "ttft_ms": 110.0,
+        "decode_tok_per_sec": 92.4,
+        "tpot_ms": 10.82,
+        "peak_ram_mb": 1200.0,
+        "peak_vram_mb": 2900.0
+      },
+      "local_efficiency": {
+        "score_per_gb": 31.31,
+        "throughput_tps": 92.4,
+        "effective_memory_gb": 2.45,
+        "efficiency_score": 93.4
+      },
+      "categories": {
+        "reasoning": {
+          "category": "reasoning",
+          "weight": 0.25,
+          "normalized_score": 82.2,
+          "task_count": 2
+        },
+        "coding": {
+          "category": "coding",
+          "weight": 0.3,
+          "normalized_score": 68.9,
+          "task_count": 1
+        },
+        "instruction": {
+          "category": "instruction",
+          "weight": 0.25,
+          "normalized_score": 77.1,
+          "task_count": 1
+        },
+        "tool_calling": {
+          "category": "tool_calling",
+          "weight": 0.2,
+          "normalized_score": 70.8,
+          "task_count": 1
+        }
+      },
+      "tasks": {
+        "gsm8k": {
+          "task_id": "gsm8k",
+          "category": "reasoning",
+          "normalized_score": 82.1,
+          "passed_samples": 1083,
+          "total_samples": 1319,
+          "ci_lower": 79.9,
+          "ci_upper": 84.1,
+          "avg_tokens_per_sec": 92.4
+        },
+        "humaneval": {
+          "task_id": "humaneval",
+          "category": "coding",
+          "normalized_score": 68.9,
+          "passed_samples": 113,
+          "total_samples": 164,
+          "ci_lower": 61.4,
+          "ci_upper": 75.5,
+          "avg_tokens_per_sec": 89.0
+        },
+        "arc": {
+          "task_id": "arc",
+          "category": "reasoning",
+          "normalized_score": 82.4,
+          "passed_samples": 966,
+          "total_samples": 1172,
+          "ci_lower": 80.1,
+          "ci_upper": 84.5,
+          "avg_tokens_per_sec": 95.0
+        },
+        "ifeval": {
+          "task_id": "ifeval",
+          "category": "instruction",
+          "normalized_score": 77.1,
+          "passed_samples": 417,
+          "total_samples": 541,
+          "ci_lower": 73.3,
+          "ci_upper": 80.5,
+          "avg_tokens_per_sec": 91.0
+        },
+        "tool_calling": {
+          "task_id": "tool_calling",
+          "category": "tool_calling",
+          "normalized_score": 70.8,
+          "passed_samples": 212,
+          "total_samples": 300,
+          "ci_lower": 65.5,
+          "ci_upper": 75.6,
+          "avg_tokens_per_sec": 88.0
+        }
+      },
+      "provenance": {},
+      "notes": "Extremely high local efficiency: 31.3 score per GB VRAM on a consumer RTX 4060.",
+      "raw_logs_preview": "[2026-10-18 13:30:00] AutoAWQ quantization verified. High efficiency in memory constrained setups.",
+      "rank": 4
+    },
+    {
+      "filename": "meta-llama_Llama-3.2-3B-Instruct-BF16.json",
+      "file_path": "data/results/meta-llama_Llama-3.2-3B-Instruct-BF16.json",
+      "evaluation_id": "eval-llama32-3b-bf16",
+      "timestamp": "2026-10-15T19:30:00Z",
+      "profile": "quick",
+      "submitter": {
+        "name": "Clara Oswald",
+        "github_handle": "clara-ml",
+        "affiliation": "TinyModels Org"
+      },
+      "model": {
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "model_slug": "Llama-3.2-3B-Instruct-BF16",
+        "hf_url": "https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct",
+        "param_count_b": 3.21,
+        "param_tier": "3B\u20137B",
+        "architecture": "LlamaForCausalLM",
+        "quantization": "BF16",
+        "model_ram_gb": 6.4,
+        "context_length": 131072,
+        "license": "Llama 3.2 Community",
+        "backend": "transformers",
+        "reasoning_effort": null
+      },
+      "scores": {
+        "overall": 73.65,
+        "ci_lower": 71.8,
+        "ci_upper": 75.4,
+        "coding_agentic_index": 66.44,
+        "local_efficiency_score": 86.8,
+        "score_per_gb": 11.51,
+        "gsm8k": 77.2,
+        "humaneval": 63.4,
+        "arc": 78.5,
+        "ifeval": 76.8,
+        "tool_calling": 71.0
+      },
+      "hardware": {
+        "gpu_name": "NVIDIA GeForce RTX 4070",
+        "gpu_count": 1,
+        "gpu_vram_gb": 12.0,
+        "cpu": "Intel Core i5-13600K",
+        "cpu_cores": 14,
+        "total_ram_gb": 32.0,
+        "model_ram_gb": 6.4,
+        "os": "Ubuntu 24.04 LTS",
+        "cuda_version": "12.4",
+        "driver_version": "550.54"
+      },
+      "telemetry": {
+        "ttft_ms": 120.0,
+        "decode_tok_per_sec": 84.5,
+        "tpot_ms": 11.83,
+        "peak_ram_mb": 1450.0,
+        "peak_vram_mb": 6900.0
+      },
+      "local_efficiency": {
+        "score_per_gb": 11.51,
+        "throughput_tps": 84.5,
+        "effective_memory_gb": 6.4,
+        "efficiency_score": 86.8
+      },
+      "categories": {
+        "reasoning": {
+          "category": "reasoning",
+          "weight": 0.25,
+          "normalized_score": 77.8,
+          "task_count": 2
+        },
+        "coding": {
+          "category": "coding",
+          "weight": 0.3,
+          "normalized_score": 63.4,
+          "task_count": 1
+        },
+        "instruction": {
+          "category": "instruction",
+          "weight": 0.25,
+          "normalized_score": 76.8,
+          "task_count": 1
+        },
+        "tool_calling": {
+          "category": "tool_calling",
+          "weight": 0.2,
+          "normalized_score": 71.0,
+          "task_count": 1
+        }
+      },
+      "tasks": {
+        "gsm8k": {
+          "task_id": "gsm8k",
+          "category": "reasoning",
+          "normalized_score": 77.2,
+          "passed_samples": 1018,
+          "total_samples": 1319,
+          "ci_lower": 74.9,
+          "ci_upper": 79.4,
+          "avg_tokens_per_sec": 84.5
+        },
+        "humaneval": {
+          "task_id": "humaneval",
+          "category": "coding",
+          "normalized_score": 63.4,
+          "passed_samples": 104,
+          "total_samples": 164,
+          "ci_lower": 55.8,
+          "ci_upper": 70.4,
+          "avg_tokens_per_sec": 81.0
+        },
+        "arc": {
+          "task_id": "arc",
+          "category": "reasoning",
+          "normalized_score": 78.5,
+          "passed_samples": 920,
+          "total_samples": 1172,
+          "ci_lower": 76.1,
+          "ci_upper": 80.8,
+          "avg_tokens_per_sec": 88.0
+        },
+        "ifeval": {
+          "task_id": "ifeval",
+          "category": "instruction",
+          "normalized_score": 76.8,
+          "passed_samples": 415,
+          "total_samples": 541,
+          "ci_lower": 73.0,
+          "ci_upper": 80.2,
+          "avg_tokens_per_sec": 85.0
+        },
+        "tool_calling": {
+          "task_id": "tool_calling",
+          "category": "tool_calling",
+          "normalized_score": 71.0,
+          "passed_samples": 213,
+          "total_samples": 300,
+          "ci_lower": 65.7,
+          "ci_upper": 75.8,
+          "avg_tokens_per_sec": 82.0
+        }
+      },
+      "provenance": {},
+      "notes": "Lightweight 3B parameter model running natively in BF16 on consumer GPU.",
+      "raw_logs_preview": "[2026-10-15 19:15:00] Evaluated Llama-3.2-3B-Instruct in native BF16.",
+      "rank": 5
+    },
+    {
+      "filename": "HuggingFaceTB_SmolLM2-1.7B-Instruct-BF16.json",
+      "file_path": "data/results/HuggingFaceTB_SmolLM2-1.7B-Instruct-BF16.json",
+      "evaluation_id": "eval-smollm2-17b-bf16",
+      "timestamp": "2026-10-12T14:10:00Z",
+      "profile": "quick",
+      "submitter": {
+        "name": "Louisa Martin",
+        "github_handle": "lmartin-hf",
+        "affiliation": "Hugging Face"
+      },
+      "model": {
+        "model_id": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+        "model_slug": "SmolLM2-1.7B-Instruct-BF16",
+        "hf_url": "https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct",
+        "param_count_b": 1.71,
+        "param_tier": "< 3B",
+        "architecture": "LlamaForCausalLM",
+        "quantization": "BF16",
+        "model_ram_gb": 3.42,
+        "context_length": 8192,
+        "license": "Apache-2.0",
+        "backend": "transformers",
+        "reasoning_effort": null
+      },
+      "scores": {
+        "overall": 67.3,
+        "ci_lower": 65.4,
+        "ci_upper": 69.1,
+        "coding_agentic_index": 59.1,
+        "local_efficiency_score": 89.2,
+        "score_per_gb": 19.68,
+        "gsm8k": 68.5,
+        "humaneval": 54.9,
+        "arc": 72.8,
+        "ifeval": 73.1,
+        "tool_calling": 65.4
+      },
+      "hardware": {
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "gpu_count": 1,
+        "gpu_vram_gb": 12.0,
+        "cpu": "AMD Ryzen 5 5600X",
+        "cpu_cores": 6,
+        "total_ram_gb": 32.0,
+        "model_ram_gb": 3.42,
+        "os": "Ubuntu 22.04 LTS",
+        "cuda_version": "12.1",
+        "driver_version": "535.154"
+      },
+      "telemetry": {
+        "ttft_ms": 78.0,
+        "decode_tok_per_sec": 112.5,
+        "tpot_ms": 8.89,
+        "peak_ram_mb": 950.0,
+        "peak_vram_mb": 3800.0
+      },
+      "local_efficiency": {
+        "score_per_gb": 19.68,
+        "throughput_tps": 112.5,
+        "effective_memory_gb": 3.42,
+        "efficiency_score": 89.2
+      },
+      "categories": {
+        "reasoning": {
+          "category": "reasoning",
+          "weight": 0.25,
+          "normalized_score": 70.6,
+          "task_count": 2
+        },
+        "coding": {
+          "category": "coding",
+          "weight": 0.3,
+          "normalized_score": 54.9,
+          "task_count": 1
+        },
+        "instruction": {
+          "category": "instruction",
+          "weight": 0.25,
+          "normalized_score": 73.1,
+          "task_count": 1
+        },
+        "tool_calling": {
+          "category": "tool_calling",
+          "weight": 0.2,
+          "normalized_score": 65.4,
+          "task_count": 1
+        }
+      },
+      "tasks": {
+        "gsm8k": {
+          "task_id": "gsm8k",
+          "category": "reasoning",
+          "normalized_score": 68.5,
+          "passed_samples": 903,
+          "total_samples": 1319,
+          "ci_lower": 65.9,
+          "ci_upper": 71.0,
+          "avg_tokens_per_sec": 112.5
+        },
+        "humaneval": {
+          "task_id": "humaneval",
+          "category": "coding",
+          "normalized_score": 54.9,
+          "passed_samples": 90,
+          "total_samples": 164,
+          "ci_lower": 47.3,
+          "ci_upper": 62.3,
+          "avg_tokens_per_sec": 105.0
+        },
+        "arc": {
+          "task_id": "arc",
+          "category": "reasoning",
+          "normalized_score": 72.8,
+          "passed_samples": 853,
+          "total_samples": 1172,
+          "ci_lower": 70.2,
+          "ci_upper": 75.3,
+          "avg_tokens_per_sec": 118.0
+        },
+        "ifeval": {
+          "task_id": "ifeval",
+          "category": "instruction",
+          "normalized_score": 73.1,
+          "passed_samples": 395,
+          "total_samples": 541,
+          "ci_lower": 69.2,
+          "ci_upper": 76.7,
+          "avg_tokens_per_sec": 110.0
+        },
+        "tool_calling": {
+          "task_id": "tool_calling",
+          "category": "tool_calling",
+          "normalized_score": 65.4,
+          "passed_samples": 196,
+          "total_samples": 300,
+          "ci_lower": 59.9,
+          "ci_upper": 70.5,
+          "avg_tokens_per_sec": 108.0
+        }
+      },
+      "provenance": {},
+      "notes": "Ultra-lightweight edge model. Over 110 tokens/sec on an entry RTX 3060.",
+      "raw_logs_preview": "[2026-10-12 14:00:00] Evaluating SmolLM2-1.7B lightweight sub-3B model.",
+      "rank": 6
+    },
+    {
+      "filename": "Spark-X2.6-4B-INT4-INT4.json",
+      "file_path": "data/results/Spark-X2.6-4B-INT4-INT4.json",
+      "evaluation_id": "be128133-9d8f-4fd7-a635-1768ce3bcd4a",
+      "timestamp": "2026-11-02T20:37:04.358259+00:00",
+      "profile": "quick",
+      "submitter": {
+        "name": "Community Contributor",
+        "github_handle": "anonymous",
+        "affiliation": "Open Source"
+      },
+      "model": {
+        "model_id": "XHToken/Spark-X2.6-4B-INT4",
+        "model_slug": "Spark-X2.6-4B-INT4-INT4",
+        "hf_url": "https://huggingface.co/XHToken/Spark-X2.6-4B-INT4",
+        "param_count_b": 1.97,
+        "param_tier": "<3B",
+        "architecture": "Spark2_5ForCausalLM",
+        "quantization": "INT4",
+        "model_ram_gb": 1.67,
+        "context_length": 1048576,
+        "license": "apache-2.0",
+        "backend": "openai",
+        "reasoning_effort": "high"
+      },
+      "scores": {
+        "overall": 46.88,
+        "ci_lower": 30.72,
+        "ci_upper": 69.28,
+        "coding_agentic_index": 50.0,
+        "local_efficiency_score": 73.19,
+        "score_per_gb": 28.07,
+        "gsm8k": 0.0,
+        "humaneval": 16.67,
+        "arc": 87.5,
+        "ifeval": 0.0,
+        "tool_calling": 100.0
+      },
+      "hardware": {
+        "gpu_name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+        "gpu_count": 1,
+        "gpu_vram_gb": 11.94,
+        "cpu": "Intel(R) Core(TM) Ultra 9 275HX",
+        "cpu_cores": 24,
+        "total_ram_gb": 31.43,
+        "model_ram_gb": 1.67,
+        "os": "Windows 11 (10.0.26300)",
+        "cuda_version": "13.5",
+        "driver_version": "621.01"
+      },
+      "telemetry": {
+        "ttft_ms": 3775.7,
+        "decode_tok_per_sec": 59.5,
+        "tpot_ms": null,
+        "peak_ram_mb": null,
+        "peak_vram_mb": null
+      },
+      "local_efficiency": {
+        "score_per_gb": 28.07,
+        "throughput_tps": 59.5,
+        "effective_memory_gb": 1.67,
+        "efficiency_score": 73.19
+      },
+      "categories": {
+        "reasoning": {
+          "category": "reasoning",
+          "weight": 0.25,
+          "normalized_score": 87.5,
+          "task_count": 1
+        },
+        "coding": {
+          "category": "coding",
+          "weight": 0.3,
+          "normalized_score": 16.67,
+          "task_count": 1
+        },
+        "instruction": {
+          "category": "instruction",
+          "weight": 0.25,
+          "normalized_score": 0.0,
+          "task_count": 1
+        },
+        "tool_calling": {
+          "category": "tool_calling",
+          "weight": 0.2,
+          "normalized_score": 100.0,
+          "task_count": 1
+        }
+      },
+      "tasks": {
+        "slm_reasoning_cot": {
+          "task_id": "slm_reasoning_cot",
+          "category": "reasoning",
+          "raw_score": 0.875,
+          "raw_metric_name": "accuracy",
+          "normalized_score": 87.5,
+          "total_samples": 8,
+          "passed_samples": 7,
+          "avg_latency_ms": 3464.51,
+          "avg_tokens_per_sec": 61.44,
+          "sub_metrics": {
+            "sample_details": [
+              {
+                "index": 0,
+                "expected": "13",
+                "extracted": "13",
+                "passed": true
+              },
+              {
+                "index": 1,
+                "expected": "60",
+                "extracted": "60",
+                "passed": true
+              },
+              {
+                "index": 2,
+                "expected": "17",
+                "extracted": "17",
+                "passed": true
+              },
+              {
+                "index": 3,
+                "expected": "30",
+                "extracted": "30",
+                "passed": true
+              },
+              {
+                "index": 4,
+                "expected": "14",
+                "extracted": "14",
+                "passed": true
+              },
+              {
+                "index": 5,
+                "expected": "3",
+                "extracted": "8",
+                "passed": false
+              },
+              {
+                "index": 6,
+                "expected": "30",
+                "extracted": "30",
+                "passed": true
+              },
+              {
+                "index": 7,
+                "expected": "90",
+                "extracted": "90",
+                "passed": true
+              }
+            ]
+          }
+        },
+        "slm_agentic_coding": {
+          "task_id": "slm_agentic_coding",
+          "category": "coding",
+          "raw_score": 0.16666666666666666,
+          "raw_metric_name": "pass@1",
+          "normalized_score": 16.67,
+          "total_samples": 6,
+          "passed_samples": 1,
+          "avg_latency_ms": 6348.08,
+          "avg_tokens_per_sec": 60.49,
+          "sub_metrics": {
+            "test_results": [
+              {
+                "index": 0,
+                "entry_point": "fibonacci",
+                "passed": true,
+                "message": "All test cases passed."
+              },
+              {
+                "index": 1,
+                "entry_point": "is_palindrome",
+                "passed": false,
+                "message": "Execution exception: unterminated string literal (detected at line 3) (<string>, line 3)"
+              },
+              {
+                "index": 2,
+                "entry_point": "flatten_list",
+                "passed": false,
+                "message": "Function 'flatten_list' not found in generated code."
+              },
+              {
+                "index": 3,
+                "entry_point": "two_sum",
+                "passed": false,
+                "message": "Execution exception: invalid syntax (<string>, line 1)"
+              },
+              {
+                "index": 4,
+                "entry_point": "count_vowels",
+                "passed": false,
+                "message": "Function 'count_vowels' not found in generated code."
+              },
+              {
+                "index": 5,
+                "entry_point": "find_longest_word",
+                "passed": false,
+                "message": "Execution exception: unterminated string literal (detected at line 1) (<string>, line 1)"
+              }
+            ]
+          }
+        },
+        "slm_instruction_following": {
+          "task_id": "slm_instruction_following",
+          "category": "instruction",
+          "raw_score": 0.0,
+          "raw_metric_name": "compliance_rate",
+          "normalized_score": 0.0,
+          "total_samples": 5,
+          "passed_samples": 0,
+          "avg_latency_ms": 4187.69,
+          "avg_tokens_per_sec": 60.46,
+          "sub_metrics": {
+            "constraints": [
+              {
+                "id": "json_france_metadata",
+                "rule": "Strict JSON schema with required keys",
+                "compliant": false,
+                "output_preview": "The user wants France's country information as a JSON object with keys: 'country', 'capital', 'popul"
+              },
+              {
+                "id": "negative_constraint_e",
+                "rule": "Negative constraint: no letter 'e'",
+                "compliant": false,
+                "output_preview": "We need answer user asks: \"Write a short sentence about an animal jumping without using the letter '"
+              },
+              {
+                "id": "exact_three_bullets",
+                "rule": "Format constraint: exactly 3 bullet points",
+                "compliant": false,
+                "output_preview": "The user wants 3 primary benefits of automated unit testing.\nFormat constraints:\n- Exactly 3 bullet "
+              },
+              {
+                "id": "word_count_limit",
+                "rule": "Length constraint: between 5 and 15 words",
+                "compliant": false,
+                "output_preview": "We need to summarize what an API is in exactly between 5 and 15 words. The summary must be between 5"
+              },
+              {
+                "id": "json_status_response",
+                "rule": "Strict JSON format",
+                "compliant": false,
+                "output_preview": "The user wants a valid JSON object with keys 'status' set to 'success' and 'result'. Nothing else.\nI"
+              }
+            ]
+          }
+        },
+        "slm_tool_calling_multiturn": {
+          "task_id": "slm_tool_calling_multiturn",
+          "category": "tool_calling",
+          "raw_score": 1.0,
+          "raw_metric_name": "tool_accuracy",
+          "normalized_score": 100.0,
+          "total_samples": 3,
+          "passed_samples": 3,
+          "avg_latency_ms": 1102.61,
+          "avg_tokens_per_sec": 55.63,
+          "sub_metrics": {
+            "scenarios": [
+              {
+                "scenario_id": "weather_lookup_tokyo",
+                "tool_call_valid": true,
+                "synthesis_valid": true,
+                "passed": true
+              },
+              {
+                "scenario_id": "math_calculation",
+                "tool_call_valid": true,
+                "synthesis_valid": true,
+                "passed": true
+              },
+              {
+                "scenario_id": "db_search",
+                "tool_call_valid": true,
+                "synthesis_valid": true,
+                "passed": true
+              }
+            ]
+          }
+        }
+      },
+      "provenance": {},
+      "notes": "vLLM 0.30.0 in WSL2 on GeForce RTX 5070 Ti Laptop GPU (12GB VRAM)",
+      "raw_logs_preview": "vLLM 0.30.0 in WSL2 on GeForce RTX 5070 Ti Laptop GPU (12GB VRAM)",
+      "rank": 7
+    }
+  ]
 }

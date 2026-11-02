@@ -26,7 +26,30 @@ class MockInferenceBackend(BaseInferenceBackend):
     def _generate_mock_response(self, text: str) -> str:
         prompt_lower = text.lower()
 
-        # ─── Tool Calling (Catalog & Negative Tests) ──────────────────────────
+        # ─── Tool Calling (Turn 2: Synthesizing Tool Responses) ────────────────
+        if any(term in prompt_lower for term in ["tool result:", "tool_response", "mock_tool_response", "weather in tokyo", "operation\": \"add", "calculator tool"]):
+            if "celsius" in prompt_lower or "18" in prompt_lower or "temperature" in prompt_lower:
+                return "The current weather in Tokyo is 18 degrees Celsius and Sunny."
+            if "result" in prompt_lower or "100" in prompt_lower:
+                return "The calculated result is 100."
+            if "standardized benchmarking guide" in prompt_lower or "guide" in prompt_lower:
+                return "I found the Standardized Benchmarking Guide in the database."
+            if "worker_connections" in prompt_lower:
+                return "The nginx configuration contains worker_connections 1024."
+            if "alice" in prompt_lower or "username" in prompt_lower:
+                return "Active users found: alice and bob."
+            if "msg_9843" in prompt_lower or "status\": \"sent\"" in prompt_lower:
+                return "The alert email has been successfully sent."
+            if "128.5" in prompt_lower or "volume" in prompt_lower:
+                return "Current stock price of NVDA is 128.5."
+            if "cal_301" in prompt_lower or "confirmed" in prompt_lower:
+                return "The meeting has been confirmed on the calendar."
+            if "144" in prompt_lower:
+                return "The product is 144."
+            if "leaderboard" in prompt_lower or "readme" in prompt_lower:
+                return "The README contains details on the leaderboard and benchmarks."
+
+        # ─── Tool Calling (Turn 1: Tool Selection & Negative Refusal) ─────────
         if "available tools" in prompt_lower:
             # Negative Tests: Must NOT return tool call
             if "photosynthesis converts sunlight" in prompt_lower:

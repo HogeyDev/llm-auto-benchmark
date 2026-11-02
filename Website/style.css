@@ -1780,6 +1780,216 @@ samp {
   white-space: pre-wrap;
 }
 
+/* ---------- Track Switcher & Profiles ---------- */
+
+.track-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--rule);
+}
+
+.track-pills-label {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-right: 4px;
+}
+
+.track-pill {
+  padding: 5px 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--card);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.track-pill:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.track-pill.is-active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.tag--profile-quick {
+  border-color: #c4820a;
+  color: #8f5c00;
+  background: #fdf5e6;
+}
+
+.tag--profile-standard {
+  border-color: var(--moss);
+  color: var(--moss);
+  background: var(--moss-wash);
+}
+
+.tag--profile-extended {
+  border-color: var(--rust);
+  color: var(--rust);
+  background: var(--rust-wash);
+}
+
+.tag--effort {
+  border-color: #60594a;
+  color: #433e33;
+  font-style: italic;
+}
+
+.ci-range {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.02em;
+  margin-top: 1px;
+}
+
+.task-ci {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--ink-4);
+  margin-left: 6px;
+}
+
+/* Modal: Telemetry panels */
+
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.telemetry-card {
+  padding: 9px 11px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  border-radius: 2px;
+}
+
+.telemetry-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.telemetry-val {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.telemetry-sub {
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--ink-4);
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.category-card {
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.category-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.category-card-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.category-card-score {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rust);
+}
+
+.category-card-bar {
+  height: 4px;
+  background: var(--paper-3);
+  overflow: hidden;
+  border-radius: 1px;
+}
+
+.category-card-fill {
+  height: 100%;
+  background: var(--rust);
+}
+
+/* Method Profile Badges in Aside */
+
+.method-profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+
+.method-profile-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+}
+
+.method-profile-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.method-profile-desc {
+  font-size: 8.5px;
+  color: var(--ink-3);
+}
+
+/* Responsive filter tweaks */
+@media (min-width: 861px) {
+  .filters {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 1040px) {

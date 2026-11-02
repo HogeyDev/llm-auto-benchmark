@@ -76,8 +76,9 @@ def evaluate(
     api_key: str = typer.Option("EMPTY", "--api-key", envvar="OPENAI_API_KEY", help="API key for custom or remote endpoint if required"),
     model_ram_gb: Optional[float] = typer.Option(None, "--model-ram-gb", "--ram-gb", help="Size in RAM / VRAM in GB that the model takes up"),
     output_dir: str = typer.Option("data/results", "--output-dir", "-o", help="Target directory for output JSON"),
+    profile: Optional[str] = typer.Option("standard", "--profile", "-p", help="Evaluation profile: quick, standard, extended"),
     sample_limit: Optional[int] = typer.Option(None, "--sample-limit", "-n", help="Limit samples per task (for testing)"),
-    tasks: Optional[str] = typer.Option(None, "--tasks", "-t", help="Comma-separated list of tasks to run (reasoning, coding, instruction, tool_calling)"),
+    tasks: Optional[str] = typer.Option(None, "--tasks", "-t", help="Comma-separated list of tasks to run (reasoning, coding, instruction, tool_calling, etc.)"),
     submit: bool = typer.Option(False, "--submit", "-s", help="Automatically submit results via Pull Request after eval"),
     github_repo: Optional[str] = typer.Option(None, "--github-repo", help="Target GitHub repository (e.g. owner/repo)"),
     token: Optional[str] = typer.Option(None, "--token", envvar="GITHUB_TOKEN", help="GitHub Personal Access Token"),
@@ -90,7 +91,9 @@ def evaluate(
     setup_logger()
     if isinstance(reasoning_effort, typer.models.OptionInfo):
         reasoning_effort = None
-    logger.info(f"Initiating evaluation for [bold green]{model_id}[/bold green] using [cyan]{backend}[/cyan] backend...")
+    if isinstance(profile, typer.models.OptionInfo) or not profile:
+        profile = "standard"
+    logger.info(f"Initiating evaluation for [bold green]{model_id}[/bold green] using [cyan]{backend}[/cyan] backend (profile: {profile})...")
 
     # 1. Hardware and Model Metadata
     meta = fetch_hf_model_metadata(model_id, quantization=quantization, backend=backend, model_ram_gb=model_ram_gb)
@@ -157,11 +160,12 @@ def evaluate(
         model_meta=meta,
         hardware_info=hw,
         selected_tasks=task_list,
+        profile=profile if not task_list else None,
         sample_limit=sample_limit,
         notes=final_notes,
     )
 
-    # 6. Save JSON Output
+    # 7. Save JSON Output
     out_path = Path(output_dir)
     if output_dir == "data/results":
         if Path("website/data/results").exists():
@@ -174,14 +178,21 @@ def evaluate(
     result_file.write_text(json_str, encoding="utf-8")
     logger.info(f"Standardized result successfully saved to: [bold cyan]{result_file}[/bold cyan]")
 
-    # 7. Render Result Summary Table
-    summary_table = Table(title=f"[Benchmark Summary: {meta.model_slug}]", show_header=True, header_style="bold cyan")
+    # 8. Render Result Summary Table
+    summary_table = Table(title=f"[Benchmark Summary: {meta.model_slug} (Profile: {result.profile})]", show_header=True, header_style="bold cyan")
     summary_table.add_column("Category", style="bold")
     summary_table.add_column("Weight")
     summary_table.add_column("Normalized Score", style="bold yellow")
     for cat_name, cat in result.categories.items():
-        summary_table.add_row(cat_name.title(), f"{cat.weight * 100:.0f}%", f"{cat.normalized_score:.2f}%")
+        if cat.task_count > 0:
+            summary_table.add_row(cat_name.title(), f"{cat.weight * 100:.0f}%", f"{cat.normalized_score:.2f}%")
     summary_table.add_row("[bold]Composite SLM-Index[/bold]", "100%", f"[bold green]{result.slm_index:.2f}%[/bold green]")
+    if result.coding_agentic_index is not None:
+        summary_table.add_row("[bold cyan]Coding & Agentic Index[/bold cyan]", "Specialist", f"[bold cyan]{result.coding_agentic_index:.2f}%[/bold cyan]")
+    if result.local_efficiency:
+        eff = result.local_efficiency
+        summary_table.add_row("[bold magenta]Score / GB Memory[/bold magenta]", "Efficiency", f"[bold magenta]{eff.get('score_per_gb', 'N/A')} pts/GB[/bold magenta]")
+        summary_table.add_row("[bold magenta]Inference Throughput[/bold magenta]", "Efficiency", f"[bold magenta]{eff.get('tokens_per_sec', 'N/A')} tok/s[/bold magenta]")
     console.print(summary_table)
 
     # 8. Automated Submission if requested
@@ -221,6 +232,7 @@ def batch(
     notes: Optional[str] = typer.Option(None, "--notes", help="Optional notes on batch evaluation environment or runner"),
     quantization: str = typer.Option("BF16", "--quantization", "-q", help="Quantization method"),
     output_dir: str = typer.Option("data/results", "--output-dir", "-o", help="Target results directory"),
+    profile: Optional[str] = typer.Option("standard", "--profile", "-p", help="Evaluation profile: quick, standard, extended"),
     sample_limit: Optional[int] = typer.Option(None, "--sample-limit", "-n", help="Sample limit per task"),
     submit: bool = typer.Option(False, "--submit", "-s", help="Submit PR for each model"),
     github_repo: Optional[str] = typer.Option(None, "--github-repo", help="Target GitHub repository"),
@@ -232,6 +244,8 @@ def batch(
     setup_logger()
     if isinstance(reasoning_effort, typer.models.OptionInfo):
         reasoning_effort = None
+    if isinstance(profile, typer.models.OptionInfo) or not profile:
+        profile = "standard"
     if not batch_file.exists():
         logger.error(f"Batch file not found: {batch_file}")
         raise typer.BadParameter(f"File not found: {batch_file}")
@@ -256,6 +270,7 @@ def batch(
             api_key=api_key,
             model_ram_gb=model_ram_gb,
             output_dir=output_dir,
+            profile=profile,
             sample_limit=sample_limit,
             tasks=None,
             submit=submit,
@@ -316,6 +331,67 @@ def init_website(
     from .website_template import scaffold_website
     scaffold_website(target_dir)
     logger.info(f"Static website scaffolded successfully at [bold green]{target_dir}[/bold green]")
+
+
+@app.command(name="list-benchmarks")
+def list_benchmarks_cmd():
+    """List all registered benchmark suites, task descriptions, and evaluation profiles."""
+    from .benchmarks.registry import BENCHMARK_REGISTRY, EVALUATION_PROFILES, get_task
+    setup_logger()
+
+    p_table = Table(title="[Evaluation Profiles]", show_header=True, header_style="bold magenta")
+    p_table.add_column("Profile", style="bold cyan")
+    p_table.add_column("Tasks Count", style="yellow")
+    p_table.add_column("Task Identifiers", style="dim")
+    for pname, tlist in EVALUATION_PROFILES.items():
+        p_table.add_row(pname.upper(), str(len(tlist)), ", ".join(tlist))
+    console.print(p_table)
+
+    t_table = Table(title="[Available Benchmark Tasks]", show_header=True, header_style="bold green")
+    t_table.add_column("Task ID", style="bold yellow")
+    t_table.add_column("Category", style="cyan")
+    t_table.add_column("Description")
+    for tid in sorted(BENCHMARK_REGISTRY.keys()):
+        try:
+            task_obj = get_task(tid)
+            t_table.add_row(tid, task_obj.category, task_obj.description)
+        except Exception:
+            t_table.add_row(tid, "general", "External / Adapter Task")
+    console.print(t_table)
+
+
+@app.command(name="compare-quantization")
+def compare_quantization_cmd(
+    baseline_file: Path = typer.Option(..., "--baseline", "-b", help="JSON result file of higher precision baseline (e.g. BF16, Q8)"),
+    quantized_file: Path = typer.Option(..., "--quantized", "-q", help="JSON result file of quantized model (e.g. Q4, INT4)"),
+):
+    """Analyze capability retention, degradation percentage, and RAM savings between quantization levels."""
+    from .scoring.quantization import compare_quantizations
+    setup_logger()
+
+    if not baseline_file.exists():
+        logger.error(f"Baseline file not found: {baseline_file}")
+        raise typer.BadParameter("File not found")
+    if not quantized_file.exists():
+        logger.error(f"Quantized file not found: {quantized_file}")
+        raise typer.BadParameter("File not found")
+
+    base_res = BenchmarkResult.model_validate_json(baseline_file.read_text(encoding="utf-8"))
+    quant_res = BenchmarkResult.model_validate_json(quantized_file.read_text(encoding="utf-8"))
+
+    comp = compare_quantizations(base_res, quant_res)
+
+    table = Table(title=f"[Quantization Tradeoff: {comp['model_id']}]", show_header=True, header_style="bold cyan")
+    table.add_column("Metric", style="bold")
+    table.add_column("Baseline Value", style="yellow")
+    table.add_column("Quantized Value", style="green")
+    table.add_column("Delta / Tradeoff", style="bold magenta")
+
+    table.add_row("Format", comp["baseline_quantization"], comp["quantized_format"], "-")
+    table.add_row("SLM-Index Score", f"{comp['baseline_slm_index']:.2f}%", f"{comp['quantized_slm_index']:.2f}%", f"{comp['score_delta']:+.2f}%")
+    table.add_row("Degradation", "0.00%", f"{comp['degradation_pct']:.2f}%", f"{comp['retention_pct']:.2f}% retained")
+    table.add_row("RAM / VRAM Footprint", f"{comp['baseline_ram_gb']:.2f} GB", f"{comp['quantized_ram_gb']:.2f} GB", f"-{comp['ram_savings_gb']:.2f} GB ({comp['ram_savings_pct']:.1f}% saved)")
+    console.print(table)
 
 
 @app.command()

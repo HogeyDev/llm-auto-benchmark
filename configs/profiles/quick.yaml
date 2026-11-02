@@ -1,0 +1,8 @@
+name: "quick"
+description: "Rapid local evaluation profile for initial smoke tests and fast sanity checks"
+sample_limit: 5
+tasks:
+  - "slm_reasoning_cot"
+  - "slm_coding_agent"
+  - "slm_instruction_ifeval"
+  - "slm_tool_calling_multiturn"

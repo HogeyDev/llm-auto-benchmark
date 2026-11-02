@@ -45,6 +45,8 @@ class TaskMetric(BaseModel):
     normalized_score: float = Field(..., ge=0.0, le=100.0, description="Normalized score 0.0 - 100.0%")
     total_samples: int = Field(..., description="Number of test items evaluated")
     passed_samples: int = Field(..., description="Number of passed test items")
+    ci_lower: Optional[float] = Field(None, description="Wilson score 95% confidence interval lower bound")
+    ci_upper: Optional[float] = Field(None, description="Wilson score 95% confidence interval upper bound")
     avg_latency_ms: Optional[float] = Field(None, description="Average response latency in milliseconds")
     avg_tokens_per_sec: Optional[float] = Field(None, description="Average generation speed in tokens/second")
     sub_metrics: Dict[str, Any] = Field(default_factory=dict, description="Fine-grained metric breakdowns")
@@ -69,6 +71,10 @@ class BenchmarkResult(BaseModel):
     categories: Dict[str, CategoryScore] = Field(..., description="Category-level aggregates")
     slm_index: float = Field(..., ge=0.0, le=100.0, description="Overall normalized aggregate composite score (0-100%)")
     notes: Optional[str] = Field(None, description="Evaluation run notes or environment details")
+    profile: Optional[str] = Field("standard", description="Evaluation profile: quick, standard, extended")
+    coding_agentic_index: Optional[float] = Field(None, description="Specialized coding and agentic execution index")
+    local_efficiency: Optional[Dict[str, Any]] = Field(None, description="Local inference efficiency telemetry metrics")
+    provenance: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Dataset revisions, prompt template hashes, and seeds")
 
     def to_summary_dict(self) -> Dict[str, Any]:
         """Compact summary suitable for leaderboard table rendering."""
@@ -80,6 +86,7 @@ class BenchmarkResult(BaseModel):
             "quantization": self.model.quantization,
             "backend": self.model.backend,
             "slm_index": round(self.slm_index, 2),
+            "coding_agentic_index": round(self.coding_agentic_index, 2) if self.coding_agentic_index is not None else None,
             "reasoning": round(self.categories.get("reasoning", CategoryScore(category="reasoning", weight=0.25, normalized_score=0.0, task_count=0)).normalized_score, 2),
             "coding": round(self.categories.get("coding", CategoryScore(category="coding", weight=0.30, normalized_score=0.0, task_count=0)).normalized_score, 2),
             "instruction": round(self.categories.get("instruction", CategoryScore(category="instruction", weight=0.25, normalized_score=0.0, task_count=0)).normalized_score, 2),
@@ -87,6 +94,7 @@ class BenchmarkResult(BaseModel):
             "gpu": self.hardware.gpu_name or "CPU",
             "model_ram_gb": self.hardware.model_ram_gb or self.model.model_ram_gb,
             "reasoning_effort": self.model.reasoning_effort,
+            "profile": self.profile,
             "notes": self.notes,
             "timestamp": self.timestamp,
         }
