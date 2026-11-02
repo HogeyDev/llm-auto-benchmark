@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "slm-bench"
 version = "0.1.0"
-description = "Automated Evaluation Harness and GitHub Pages PR Submission System for Small LLMs (<=50B)"
+description = "Automated Evaluation Harness and GitHub Pages PR Submission System for Small Local AI"
 authors = [
-    { name = "SLM Benchmarking Team", email = "slm-bench@deepmind.internal" }
+    { name = "Sean Dolan", email = "148463374+SeanDolan0@users.noreply.github.com" }
 ]
 readme = "README.md"
 requires-python = ">=3.10"

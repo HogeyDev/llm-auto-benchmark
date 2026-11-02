@@ -3,10 +3,10 @@
 [![GitHub Pages](https://img.shields.io/badge/Leaderboard-GitHub%20Pages-brightgreen.svg)](https://seandolan0.github.io/llm-auto-benchmark/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![SLM Limit](https://img.shields.io/badge/Model%20Ceiling-%E2%89%A4%2050B-purple.svg)](#slm-parameter-ceiling--50b)
+[![Category](https://img.shields.io/badge/Category-Small%20Local%20AI-purple.svg)](#small-local-ai)
 [![CI Tests](https://img.shields.io/badge/Tests-Pytest%20Passing-emerald.svg)](tests/)
 
-An automated evaluation harness, benchmark runner, and community submission pipeline designed specifically for benchmarking **Small Language Models (SLMs, $\le 50\text{B}$ parameters)** and publishing validated results to a zero-server **GitHub Pages** leaderboard via automated Pull Requests.
+An automated evaluation harness, benchmark runner, and community submission pipeline designed specifically for benchmarking **Small Local AI models** and publishing validated results to a zero-server **GitHub Pages** leaderboard via automated Pull Requests. Model inclusion is curated by the maintainer to ensure models qualify as small local AI.
 
 🌐 **Live Leaderboard:** [https://seandolan0.github.io/llm-auto-benchmark/](https://seandolan0.github.io/llm-auto-benchmark/)
 
@@ -14,11 +14,12 @@ An automated evaluation harness, benchmark runner, and community submission pipe
 
 ## 🌟 Key Architecture & Highlights
 
-1. **Focused on Small LLMs ($\le 50\text{B}$)**:
-   - Validates that evaluated models do not exceed the 50B parameter ceiling.
-   - Categorizes models into practical parameter tiers: `< 3B`, `3B–7B`, `7B–14B`, `14B–32B`, `32B–50B`.
+1. **Focused on Small Local AI**:
+   - Designed for models suited for local execution on consumer and workstation hardware.
+   - Model inclusion is curated by the project maintainer to determine if models are small enough for the leaderboard.
+   - Categorizes models into practical parameter tiers: `< 3B`, `3B–7B`, `7B–14B`, `14B–32B`, `32B+`.
 2. **Multi-Backend Inference with Low-VRAM Quantization**:
-   - **`llama.cpp` / GGUF**: Granular layer-by-layer GPU offloading (`n_gpu_layers`) allowing 14B–32B models to run comfortably on standard 12GB–16GB consumer GPUs (e.g. RTX 4070/5070) with RAM fallback.
+   - **`llama.cpp` / GGUF**: Granular layer-by-layer GPU offloading (`n_gpu_layers`) allowing 14B–32B+ models to run comfortably on standard 12GB–16GB consumer GPUs (e.g. RTX 4070/5070) with RAM fallback.
    - **`vLLM`**: High-concurrency batched inference with PagedAttention and native AWQ / GPTQ / FP8 support.
    - **`Transformers` + `bitsandbytes`**: Direct evaluation of arbitrary Hugging Face repo IDs in 4-bit (NF4) or 8-bit precision with `device_map="auto"`.
    - **`MockBackend`**: Deterministic simulation for lightning-fast testing and CI/CD validation.
@@ -31,7 +32,7 @@ An automated evaluation harness, benchmark runner, and community submission pipe
    - **Composite SLM-Index**: Overall weighted composite score normalized to $0.0 - 100.0\%$.
 4. **Automated GitHub Pages PR Workflow**:
    - The CLI (`--submit`) clones the leaderboard repository, creates branch `eval/<model-slug>`, commits result JSON to `website/data/results/<model-slug>.json`, pushes, and opens an automated Pull Request with formatted hardware specs and task metrics.
-   - GitHub Actions validates schema and model bounds on every PR.
+   - GitHub Actions validates schema and hardware specs on every PR.
    - Once merged into `main`, GitHub Pages automatically updates and redeploys the leaderboard!
 5. **Static Client-Side Leaderboard Application**:
    - 100% static web application with glassmorphism dark mode, real-time search, multi-column sorting, tier/quantization/license filtering, head-to-head model comparison drawer, Chart.js radar capability diagrams, and deep telemetry inspector modals.
@@ -45,7 +46,7 @@ llm-auto-benchmark/
 ├── .github/
 │   ├── workflows/
 │   │   ├── deploy-pages.yml         # Aggregates data & deploys website to GitHub Pages
-│   │   ├── validate-submission.yml  # Validates PR schema & ≤ 50B parameter limit
+│   │   ├── validate-submission.yml  # Validates PR schema & small local AI submissions
 │   │   └── ci.yml                   # Automated Pytest suite across Python versions & OS
 │   └── pull_request_template.md     # Auto-populated PR description template
 ├── slm_bench/                       # Python evaluation harness & CLI package
@@ -162,13 +163,13 @@ Open [http://localhost:8000](http://localhost:8000) in your web browser.
 
 ## 🤝 Contributing Benchmark Results
 
-We welcome community benchmark submissions for any open-weights model with **$\le 50$ Billion parameters**!
+We welcome community benchmark submissions for open-weights models that qualify as **Small Local AI**!
 
 1. Fork and clone the repository.
 2. Run your benchmark using `slm-bench evaluate`.
 3. Save or copy your verified result JSON into `website/data/results/<model_slug>.json`.
 4. Run `python website/scripts/aggregate.py` to verify compilation.
-5. Open a Pull Request. GitHub Actions will automatically validate your submission schema. Once approved and merged, GitHub Pages deploys the updated leaderboard automatically.
+5. Open a Pull Request. GitHub Actions will automatically validate your submission schema. The maintainer will review submissions to determine if the model is suitable for the leaderboard, and GitHub Pages will deploy the updated leaderboard upon merge.
 
 ---
 

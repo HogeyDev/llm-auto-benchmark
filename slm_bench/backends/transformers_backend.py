@@ -10,7 +10,7 @@ from ..utils.logger import logger
 
 class TransformersBackend(BaseInferenceBackend):
     """
-    Transformers backend optimized for running <=50B parameter models
+    Transformers backend optimized for running small local AI models
     using bitsandbytes NF4, 8-bit, or native bfloat16 precision with device_map="auto".
     """
 

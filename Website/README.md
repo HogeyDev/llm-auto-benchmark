@@ -4,7 +4,7 @@ A modern, responsive, 100% client-side web application designed to host an **Ope
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![GitHub Pages](https://img.shields.io/badge/hosting-GitHub%20Pages-brightgreen.svg)
-![Evaluations](https://img.shields.io/badge/models-%E2%89%A4%2050B%20SLM-cyan.svg)
+![Evaluations](https://img.shields.io/badge/models-Small%20Local%20AI-cyan.svg)
 
 ---
 
@@ -20,7 +20,7 @@ A modern, responsive, 100% client-side web application designed to host an **Ope
 - **Interactive UI & Leaderboard Table:**
   - Dynamic full-text search across model name, architecture, license, and hardware backend.
   - Multi-column sorting (Rank, Model Name, Parameter Count, Overall Score, GSM8K, HumanEval, ARC, IFEval, Tool Calling).
-  - Multi-dimensional filters for **Parameter Tiers** (`< 3B`, `3B–7B`, `7B–14B`, `14B–32B`, `32B–50B`), **Model Licenses** (Apache-2.0, MIT, Llama Community, etc.), and **Quantization Precision** (BF16, AWQ, GGUF Q4/Q8, NF4).
+  - Multi-dimensional filters for **Parameter Tiers** (`< 3B`, `3B–7B`, `7B–14B`, `14B–32B`, `32B+`), **Model Licenses** (Apache-2.0, MIT, Llama Community, etc.), and **Quantization Precision** (BF16, AWQ, GGUF Q4/Q8, NF4).
   - Direct links to model cards on the **Hugging Face Hub**.
 - **Deep Model Telemetry & Inspector Modal:**
   - Click any model row to inspect hardware specs (GPU, VRAM, CPU cores, system RAM, OS, CUDA/driver versions).
@@ -118,7 +118,7 @@ Ensure your generated JSON file:
    git push origin submit/qwen-2.5-7b
    ```
 2. Open a Pull Request on GitHub. GitHub will automatically populate our [PR Template](PR_TEMPLATE.md).
-3. The `.github/workflows/validate-submission.yml` action will automatically verify your file schema, check that parameter count &le; 50B, and validate scores.
+3. The `.github/workflows/validate-submission.yml` action will automatically verify your file schema, check small local AI criteria (reviewed by maintainer), and validate scores.
 4. Once reviewed and merged, GitHub Pages will automatically re-deploy the updated leaderboard!
 
 ---

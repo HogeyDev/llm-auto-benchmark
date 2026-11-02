@@ -22,7 +22,7 @@ from .utils.logger import console, logger, setup_logger
 
 app = typer.Typer(
     name="slm-bench",
-    help="Automated Evaluation Harness and GitHub PR Submission System for Small LLMs (<=50B).",
+    help="Automated Evaluation Harness and GitHub PR Submission System for Small Local AI.",
     add_completion=False,
 )
 
@@ -74,7 +74,7 @@ def evaluate(
     github_repo: Optional[str] = typer.Option(None, "--github-repo", help="Target GitHub repository (e.g. owner/repo)"),
     token: Optional[str] = typer.Option(None, "--token", envvar="GITHUB_TOKEN", help="GitHub Personal Access Token"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Dry-run mode: do not push Git commits or open real PRs"),
-    allow_over_50b: bool = typer.Option(False, "--allow-over-50b", help="Allow benchmarking models exceeding 50B parameters"),
+    allow_over_50b: bool = typer.Option(True, "--allow-over-50b", help="Deprecated flag maintained for backwards compatibility"),
     notes: Optional[str] = typer.Option(None, "--notes", help="Optional notes to store in metadata"),
 ):
     """Run benchmark evaluation suite on a single model and save standardized JSON."""
@@ -85,14 +85,9 @@ def evaluate(
     hw = get_hardware_info()
     meta = fetch_hf_model_metadata(model_id, quantization=quantization, backend=backend)
 
-    # 2. SLM Parameter Threshold Check
-    if meta.param_count_b and meta.param_count_b > 50.0 and not allow_over_50b:
-        err_msg = (
-            f"Model '{model_id}' estimated at {meta.param_count_b:.1f}B parameters, "
-            f"exceeding the 50B SLM limit. Use --allow-over-50b to bypass."
-        )
-        logger.error(err_msg)
-        raise typer.BadParameter(err_msg)
+    # 2. Model Telemetry Logging (Small Local AI)
+    if meta.param_count_b:
+        logger.info(f"Model '{model_id}' evaluated at {meta.param_count_b:.1f}B parameters (class: Small Local AI).")
 
     # 3. Instantiate Backend
     try:
@@ -206,7 +201,7 @@ def batch(
             github_repo=github_repo,
             token=token,
             dry_run=dry_run,
-            allow_over_50b=False,
+            allow_over_50b=True,
             notes="Batch evaluation",
         )
         results.append(res)

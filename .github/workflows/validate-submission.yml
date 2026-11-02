@@ -69,9 +69,8 @@ jobs:
                   print(f"❌ Invalid param_count_b: {params}")
                   sys.exit(1)
 
-              if params > 50.0:
-                  print(f"❌ Parameter count ({params}B) exceeds the 50B SLM ceiling in {filepath}")
-                  sys.exit(1)
+              # Submissions are classified as Small Local AI (suitability reviewed by maintainer)
+              print(f"ℹ️ Model size: {params}B parameters (Class: Small Local AI)")
 
               # Validate hardware
               hw = data.get("hardware")

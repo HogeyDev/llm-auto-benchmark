@@ -367,7 +367,7 @@ const EMBEDDED_FALLBACK_DATA = {
 
 // Markdown PR template content
 const PR_TEMPLATE_TEXT = `### Model Submission Checklist
-- [x] Model parameter size is \\le 50B parameters.
+- [x] Model qualifies as a small local AI (reviewed and determined by maintainer).
 - [x] Benchmark evaluations were run with reproducible harness settings.
 - [x] Result JSON file follows the standardized schema.
 - [x] Result file placed in \`/data/results/<organization>_<model_slug>.json\`.
@@ -571,7 +571,7 @@ function applyFiltersAndSort() {
       if (tierFilter === '3B–7B' && (p < 3.0 || p > 7.0)) return false;
       if (tierFilter === '7B–14B' && (p <= 7.0 || p > 14.0)) return false;
       if (tierFilter === '14B–32B' && (p <= 14.0 || p > 32.0)) return false;
-      if (tierFilter === '32B–50B' && (p <= 32.0 || p > 50.0)) return false;
+      if ((tierFilter === '32B+' || tierFilter === '32B–50B' || tierFilter === '> 32B') && p <= 32.0) return false;
     }
 
     // License filter
@@ -1329,7 +1329,6 @@ function runLocalJsonValidation() {
     else {
       if (!data.model.model_id) errors.push("Missing 'model.model_id'.");
       if (!data.model.param_count_b) errors.push("Missing 'model.param_count_b'.");
-      else if (data.model.param_count_b > 50.0) errors.push(`Parameter count (${data.model.param_count_b}B) exceeds the 50B SLM limit.`);
       if (!data.model.quantization) errors.push("Missing 'model.quantization'.");
       if (!data.model.license) errors.push("Missing 'model.license'.");
     }

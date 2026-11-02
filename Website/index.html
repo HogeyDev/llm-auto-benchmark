@@ -57,7 +57,7 @@
               </span>
             </h1>
           </div>
-          <p class="text-xs text-slate-400 hidden sm:block">Open &bull; Reproducible &bull; Community-Driven Evaluations (&le; 50B)</p>
+          <p class="text-xs text-slate-400 hidden sm:block">Open &bull; Reproducible &bull; Small Local AI Evaluations</p>
         </div>
       </div>
 
@@ -113,7 +113,7 @@
             <i class="fa-solid fa-server text-cyan-400/60 text-sm"></i>
           </div>
           <div id="stat-model-count" class="text-2xl sm:text-3xl font-extrabold text-cyan-400 mt-2">--</div>
-          <div class="text-[11px] text-slate-500 mt-1">&le; 50B parameter limit</div>
+          <div class="text-[11px] text-slate-500 mt-1">Small Local AI Class</div>
         </div>
 
         <div class="glass-panel rounded-xl p-4 relative overflow-hidden">
@@ -184,12 +184,12 @@
             <i class="fa-solid fa-sliders text-cyan-400 mr-1"></i> Parameter Tier
           </label>
           <select id="tier-filter" class="w-full bg-[#050811] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
-            <option value="all">All Tiers (&le; 50B)</option>
+            <option value="all">All Tiers (Small Local AI)</option>
             <option value="< 3B">&lt; 3B Parameters</option>
             <option value="3B–7B">3B – 7B Parameters</option>
             <option value="7B–14B">7B – 14B Parameters</option>
             <option value="14B–32B">14B – 32B Parameters</option>
-            <option value="32B–50B">32B – 50B Parameters</option>
+            <option value="32B+">32B+ Parameters</option>
           </select>
         </div>
 
@@ -683,7 +683,7 @@ git commit -m "feat(benchmark): add Qwen2.5-7B-Instruct evaluation"
 git push origin submit/qwen-2.5-7b</span>
                 <button onclick="navigator.clipboard.writeText('git checkout -b submit/qwen-2.5-7b\ngit add data/results/Qwen_Qwen2.5-7B-Instruct-GGUF_Q4_K_M.json\ngit commit -m \"feat(benchmark): add Qwen2.5-7B-Instruct evaluation\"\ngit push origin submit/qwen-2.5-7b')" class="text-slate-500 hover:text-white ml-2"><i class="fa-regular fa-copy"></i></button>
               </pre>
-              <p class="mt-2 text-slate-400">Our GitHub Actions CI will automatically validate your submission against schema rules, verify parameter limits (&le; 50B), and re-aggregate the leaderboard on merge!</p>
+              <p class="mt-2 text-slate-400">Our GitHub Actions CI will automatically validate your submission against schema rules, verify small local AI criteria (reviewed by maintainer), and re-aggregate the leaderboard on merge!</p>
             </div>
           </div>
 

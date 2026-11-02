@@ -10,7 +10,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SLM-Bench: Small LLM Leaderboard (<=50B)</title>
+  <title>SLM-Bench: Small Local AI Leaderboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -27,7 +27,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
         <div>
           <h1 class="font-bold text-lg text-white leading-tight">SLM-Bench</h1>
-          <p class="text-xs text-slate-400">Benchmarking Models &le; 50B Parameters</p>
+          <p class="text-xs text-slate-400">Benchmarking Small Local AI Models</p>
         </div>
       </div>
       <div class="flex items-center space-x-4">
@@ -45,10 +45,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
     <div class="mb-8">
       <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-        Small Language Model Leaderboard
+        Small Local AI Leaderboard
       </h2>
       <p class="mt-2 text-slate-400 max-w-3xl text-sm sm:text-base">
-        Open, reproducible evaluations evaluating models &le; 50B on reasoning, agentic coding, instruction following, and tool calling.
+        Open, reproducible evaluations evaluating small local AI models on reasoning, agentic coding, instruction following, and tool calling.
         All submissions are verified and merged automatically via Pull Requests.
       </p>
 
@@ -63,8 +63,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           <div id="stat-top-score" class="text-2xl font-bold text-emerald-400 mt-1">--</div>
         </div>
         <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
-          <div class="text-slate-400 text-xs font-medium">Parameter Ceiling</div>
-          <div class="text-2xl font-bold text-indigo-400 mt-1">&le; 50B</div>
+          <div class="text-slate-400 text-xs font-medium">Target Category</div>
+          <div class="text-2xl font-bold text-indigo-400 mt-1">Small Local AI</div>
         </div>
         <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
           <div class="text-slate-400 text-xs font-medium">Submission Mode</div>
@@ -90,12 +90,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div>
           <label class="block text-xs font-medium text-slate-400 mb-1">Parameter Tier</label>
           <select id="tier-filter" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
-            <option value="all">All Tiers (&le; 50B)</option>
+            <option value="all">All Tiers (Small Local AI)</option>
             <option value="<3B">&lt; 3B</option>
             <option value="3B-8B">3B - 8B</option>
             <option value="8B-14B">8B - 14B</option>
             <option value="14B-35B">14B - 35B</option>
-            <option value="35B-50B">35B - 50B</option>
+            <option value="35B+">35B+</option>
           </select>
         </div>
 
@@ -990,9 +990,6 @@ jobs:
               with open(f, 'r', encoding='utf-8') as fp:
                   data = json.load(fp)
               params = data.get('model', {}).get('param_count_b', 0)
-              if params > 50.0:
-                  print(f'ERROR: {f} parameter count {params}B exceeds 50B SLM limit!')
-                  sys.exit(1)
               score = data.get('slm_index', 0.0)
               if not (0.0 <= score <= 100.0):
                   print(f'ERROR: {f} invalid slm_index: {score}')

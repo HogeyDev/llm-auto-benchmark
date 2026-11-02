@@ -6,9 +6,9 @@ Thank you for contributing benchmark evaluations to the AI Model Benchmark Leade
 
 ### 1. Submission Pre-Flight Checklist
 Please verify each of the following before requesting review:
-- [ ] **Parameter Size Limit:** The evaluated model has **&le; 50 Billion parameters** (SLM threshold).
+- [ ] **Small Local AI Scope:** The model qualifies as a small local AI (suitability reviewed and determined by maintainer).
 - [ ] **Standardized Schema:** The benchmark result JSON file conforms to the schema in `data/results/*.json`.
-- [ ] **File Location:** The JSON result file has been placed in `data/results/<organization>_<model_slug>.json`.
+- [ ] **File Location:** The JSON result file has been placed in `data/results/<organization>_<model_slug>.json` (or `website/data/results/`).
 - [ ] **Reproducible Settings:** The evaluation was executed using the benchmark harness without prompt gaming or modified ground truth.
 - [ ] **Open Weights:** The model weights are publicly accessible on the Hugging Face Hub under an open or permissive community license.
 - [ ] **Clean Git History:** Only the new/updated JSON file in `data/results/` is included in this PR (no unintended scratch files).
@@ -21,7 +21,7 @@ Please verify each of the following before requesting review:
 | **Model ID** | `e.g. Qwen/Qwen2.5-7B-Instruct` |
 | **Hugging Face Hub URL** | https://huggingface.co/`org/model` |
 | **Exact Parameter Count** | `e.g. 7.61B` |
-| **Parameter Tier** | `< 3B` / `3B–7B` / `7B–14B` / `14B–32B` / `32B–50B` |
+| **Parameter Tier** | `< 3B` / `3B–7B` / `7B–14B` / `14B–32B` / `32B+` |
 | **Architecture** | `e.g. Qwen2ForCausalLM / LlamaForCausalLM` |
 | **Quantization / Precision**| `BF16 / AWQ / GGUF Q4_K_M / GGUF Q8_0 / NF4` |
 | **Model License** | `e.g. Apache-2.0 / MIT / Llama-3.1 Community` |

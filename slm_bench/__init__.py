@@ -1,5 +1,5 @@
 """
-SLM-Bench: Automated Evaluation Harness and PR Submission System for Small LLMs (<=50B).
+SLM-Bench: Automated Evaluation Harness and PR Submission System for Small Local AI.
 """
 
 import warnings

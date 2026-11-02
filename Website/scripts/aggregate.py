@@ -84,10 +84,8 @@ def normalize_model_entry(data, file_path):
             tier = "7B–14B"
         elif param_count <= 32.0:
             tier = "14B–32B"
-        elif param_count <= 50.0:
-            tier = "32B–50B"
         else:
-            tier = "> 50B"
+            tier = "32B+"
 
     # Hugging Face URL
     model_id = model.get("model_id", "unknown/unknown")
