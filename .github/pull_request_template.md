@@ -6,7 +6,8 @@ Thank you for contributing benchmark evaluations to the AI Model Benchmark Leade
 
 ### 1. Submission Pre-Flight Checklist
 Please verify each of the following before requesting review:
-- [ ] **Small Local AI Scope:** The model qualifies as a small local AI (suitability reviewed and determined by maintainer).
+- [ ] **Everyday Hardware Scope:** The model can be reasonably run on common local hardware (consumer GPUs 6GB–16GB, Apple Silicon, or system RAM).
+- [ ] **Hardware Specs Included:** The evaluation JSON records real host hardware telemetry (GPU, VRAM, CPU, RAM).
 - [ ] **Standardized Schema:** The benchmark result JSON file conforms to the schema in `data/results/*.json`.
 - [ ] **File Location:** The JSON result file has been placed in `data/results/<organization>_<model_slug>.json` (or `website/data/results/`).
 - [ ] **Reproducible Settings:** The evaluation was executed using the benchmark harness without prompt gaming or modified ground truth.

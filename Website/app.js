@@ -367,10 +367,11 @@ const EMBEDDED_FALLBACK_DATA = {
 
 // Markdown PR template content
 const PR_TEMPLATE_TEXT = `### Model Submission Checklist
-- [x] Model qualifies as a small local AI (reviewed and determined by maintainer).
+- [x] Model can reasonably run on common local hardware (consumer GPUs, Apple Silicon, or system RAM).
+- [x] Verified hardware environment specs included (GPU, VRAM, CPU, RAM).
 - [x] Benchmark evaluations were run with reproducible harness settings.
 - [x] Result JSON file follows the standardized schema.
-- [x] Result file placed in \`/data/results/<organization>_<model_slug>.json\`.
+- [x] Result file placed in \`/data/results/<organization>_<model_slug>.json\` (or \`website/data/results/\`).
 - [x] No proprietary or restricted access models (must have open weights).
 
 ### Evaluation Summary
