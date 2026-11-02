@@ -1,7 +1,7 @@
 {
   "metadata": {
     "total_models": 11,
-    "last_updated": "2026-11-02T17:36:21.223772+00:00",
+    "last_updated": "2026-11-02T17:51:36.268740+00:00",
     "highest_overall": 87.65,
     "best_by_benchmark": {
       "gsm8k": 94.2,
@@ -53,6 +53,7 @@
         "param_tier": "7B\u201314B",
         "architecture": "Qwen2ForCausalLM",
         "quantization": "GGUF Q4_K_M",
+        "model_ram_gb": 9.55,
         "context_length": 65536,
         "license": "MIT",
         "backend": "llama.cpp"
@@ -72,6 +73,7 @@
         "cpu": "AMD Ryzen 9 7950X 16-Core Processor",
         "cpu_cores": 16,
         "total_ram_gb": 64.0,
+        "model_ram_gb": 9.55,
         "os": "Ubuntu 24.04 LTS (Linux 6.8.0-generic)",
         "cuda_version": "12.4",
         "driver_version": "550.54.14"
@@ -133,6 +135,7 @@
           "sample_preview": "Call: get_current_weather(location='Tokyo', unit='celsius') -> Valid JSON schema invocation [PASSED]"
         }
       },
+      "notes": "",
       "raw_logs_preview": "[2026-11-01 14:05:00] Initialized llama.cpp backend with -ngl 99\n[2026-11-01 14:05:02] Model deepseek-ai/DeepSeek-R1-Distill-Qwen-14B loaded (VRAM allocated: 9.8 GB)\n[2026-11-01 14:08:15] Task gsm8k completed: 1242/1319 (94.20%)\n[2026-11-01 14:12:40] Task humaneval completed: 142/164 (86.50%)\n[2026-11-01 14:16:11] Task arc completed: 1083/1172 (92.40%)\n[2026-11-01 14:19:05] Task ifeval completed: 440/541 (81.30%)\n[2026-11-01 14:22:08] Task tool_calling completed: 239/300 (79.80%)\n[2026-11-01 14:22:10] Benchmark suite finished. Overall Score: 87.65%",
       "rank": 1
     },
@@ -154,6 +157,7 @@
         "param_tier": "14B\u201332B",
         "architecture": "Qwen2ForCausalLM",
         "quantization": "GGUF Q4_K_M",
+        "model_ram_gb": 21.12,
         "context_length": 131072,
         "license": "Apache-2.0",
         "backend": "vLLM"
@@ -173,6 +177,7 @@
         "cpu": "Intel Xeon w9-3495X 56-Cores",
         "cpu_cores": 56,
         "total_ram_gb": 128.0,
+        "model_ram_gb": 21.12,
         "os": "Red Hat Enterprise Linux 9.4",
         "cuda_version": "12.3",
         "driver_version": "545.23.08"
@@ -229,6 +234,7 @@
           "avg_latency_ms": 350.0
         }
       },
+      "notes": "",
       "raw_logs_preview": "[2026-10-28 09:00:00] Initialized vLLM engine with Qwen2.5-32B-Instruct\n[2026-10-28 09:15:30] Full evaluation completed on 5 benchmarks. Average accuracy 86.90%.",
       "rank": 2
     },
@@ -250,6 +256,7 @@
         "param_tier": "7B\u201314B",
         "architecture": "Qwen2ForCausalLM",
         "quantization": "BF16",
+        "model_ram_gb": 16.36,
         "context_length": 131072,
         "license": "Apache-2.0",
         "backend": "transformers"
@@ -269,6 +276,7 @@
         "cpu": "Intel Core i9-14900K",
         "cpu_cores": 24,
         "total_ram_gb": 64.0,
+        "model_ram_gb": 16.36,
         "os": "Ubuntu 24.04 LTS",
         "cuda_version": "12.4",
         "driver_version": "550.67"
@@ -305,6 +313,7 @@
           "total_samples": 300
         }
       },
+      "notes": "",
       "raw_logs_preview": "[2026-10-29 18:00:00] Evaluating Qwen2.5-Coder-7B in BF16 unquantized mode.\n[2026-10-29 18:04:50] HumanEval pass@1 reached 88.40% (state-of-the-art for 7B).",
       "rank": 3
     },
@@ -326,6 +335,7 @@
         "param_tier": "7B\u201314B",
         "architecture": "Qwen2ForCausalLM",
         "quantization": "GGUF Q4_K_M",
+        "model_ram_gb": 4.95,
         "context_length": 32768,
         "license": "Apache-2.0",
         "backend": "llama.cpp"
@@ -345,6 +355,7 @@
         "cpu": "AMD Ryzen 9 5900X",
         "cpu_cores": 12,
         "total_ram_gb": 32.0,
+        "model_ram_gb": 4.95,
         "os": "Windows 11 (10.0.26100)",
         "cuda_version": "12.2",
         "driver_version": "551.86"
@@ -381,6 +392,7 @@
           "total_samples": 300
         }
       },
+      "notes": "",
       "raw_logs_preview": "[2026-11-02 10:00:15] llama.cpp evaluation finished for Qwen2.5-7B GGUF Q4_K_M.",
       "rank": 4
     },
@@ -402,6 +414,7 @@
         "param_tier": "7B\u201314B",
         "architecture": "Gemma2ForCausalLM",
         "quantization": "BF16",
+        "model_ram_gb": 19.87,
         "context_length": 8192,
         "license": "Gemma Terms of Use",
         "backend": "vLLM"
@@ -421,6 +434,7 @@
         "cpu": "AMD EPYC 7742",
         "cpu_cores": 32,
         "total_ram_gb": 128.0,
+        "model_ram_gb": 19.87,
         "os": "Ubuntu 22.04 LTS",
         "cuda_version": "12.4",
         "driver_version": "550.54"
@@ -457,6 +471,7 @@
           "total_samples": 300
         }
       },
+      "notes": "",
       "raw_logs_preview": "[2026-10-25 11:20:00] Executed vLLM benchmark on Google Gemma 2 9B IT in BF16 precision.",
       "rank": 5
     },
@@ -478,6 +493,7 @@
         "param_tier": "7B\u201314B",
         "architecture": "LlamaForCausalLM",
         "quantization": "GGUF Q8_0",
+        "model_ram_gb": 9.23,
         "context_length": 131072,
         "license": "Llama 3.1 Community",
         "backend": "llama.cpp"
@@ -497,6 +513,7 @@
         "cpu": "Apple M3 Max (16-core)",
         "cpu_cores": 16,
         "total_ram_gb": 48.0,
+        "model_ram_gb": 9.23,
         "os": "macOS 15.1 Sequoia",
         "cuda_version": "Metal 3",
         "driver_version": "N/A"
@@ -533,6 +550,7 @@
           "total_samples": 300
         }
       },
+      "notes": "",
       "raw_logs_preview": "[2026-10-22 16:30:10] Metal unified memory acceleration enabled. Run completed.",
       "rank": 6
     },
@@ -554,6 +572,7 @@
         "param_tier": "3B-8B",
         "architecture": "CausalLM",
         "quantization": "BF16",
+        "model_ram_gb": 6.9,
         "context_length": 8192,
         "license": "llama3.2",
         "backend": "mock"
@@ -573,6 +592,7 @@
         "cpu": "Intel64 Family 6 Model 198 Stepping 2, GenuineIntel",
         "cpu_cores": 24,
         "total_ram_gb": 31.43,
+        "model_ram_gb": 6.9,
         "os": "Windows 11 (10.0.26300)",
         "cuda_version": "13.5",
         "driver_version": "621.01"
@@ -687,6 +707,7 @@
           }
         }
       },
+      "notes": "",
       "raw_logs_preview": "Benchmark run completed successfully.",
       "rank": 7
     },
@@ -708,6 +729,7 @@
         "param_tier": "7B\u201314B",
         "architecture": "MistralForCausalLM",
         "quantization": "NF4",
+        "model_ram_gb": 7.93,
         "context_length": 128000,
         "license": "Apache-2.0",
         "backend": "bitsandbytes"
@@ -727,6 +749,7 @@
         "cpu": "Intel Core i7-13700K",
         "cpu_cores": 16,
         "total_ram_gb": 32.0,
+        "model_ram_gb": 7.93,
         "os": "Ubuntu 24.04 LTS",
         "cuda_version": "12.4",
         "driver_version": "550.54"
@@ -763,6 +786,7 @@
           "total_samples": 300
         }
       },
+      "notes": "",
       "raw_logs_preview": "[2026-10-20 08:00:00] bitsandbytes 4-bit NF4 quantization applied with bfloat16 compute.",
       "rank": 8
     },
@@ -784,6 +808,7 @@
         "param_tier": "3B\u20137B",
         "architecture": "Phi3ForCausalLM",
         "quantization": "AWQ",
+        "model_ram_gb": 2.48,
         "context_length": 131072,
         "license": "MIT",
         "backend": "AutoAWQ"
@@ -803,6 +828,7 @@
         "cpu": "AMD Ryzen 7 7700",
         "cpu_cores": 8,
         "total_ram_gb": 32.0,
+        "model_ram_gb": 2.48,
         "os": "Windows 11 (10.0.22631)",
         "cuda_version": "12.3",
         "driver_version": "546.33"
@@ -839,6 +865,7 @@
           "total_samples": 300
         }
       },
+      "notes": "",
       "raw_logs_preview": "[2026-10-18 13:30:00] AutoAWQ quantization verified. High efficiency in memory constrained setups.",
       "rank": 9
     },
@@ -860,6 +887,7 @@
         "param_tier": "3B\u20137B",
         "architecture": "LlamaForCausalLM",
         "quantization": "BF16",
+        "model_ram_gb": 6.9,
         "context_length": 131072,
         "license": "Llama 3.2 Community",
         "backend": "transformers"
@@ -879,6 +907,7 @@
         "cpu": "Intel Core i5-13600K",
         "cpu_cores": 14,
         "total_ram_gb": 32.0,
+        "model_ram_gb": 6.9,
         "os": "Ubuntu 24.04 LTS",
         "cuda_version": "12.4",
         "driver_version": "550.54"
@@ -915,6 +944,7 @@
           "total_samples": 300
         }
       },
+      "notes": "",
       "raw_logs_preview": "[2026-10-15 19:15:00] Evaluated Llama-3.2-3B-Instruct in native BF16.",
       "rank": 10
     },
@@ -936,6 +966,7 @@
         "param_tier": "< 3B",
         "architecture": "LlamaForCausalLM",
         "quantization": "BF16",
+        "model_ram_gb": 3.68,
         "context_length": 8192,
         "license": "Apache-2.0",
         "backend": "transformers"
@@ -955,6 +986,7 @@
         "cpu": "AMD Ryzen 5 5600X",
         "cpu_cores": 6,
         "total_ram_gb": 32.0,
+        "model_ram_gb": 3.68,
         "os": "Ubuntu 22.04 LTS",
         "cuda_version": "12.1",
         "driver_version": "535.154"
@@ -991,6 +1023,7 @@
           "total_samples": 300
         }
       },
+      "notes": "",
       "raw_logs_preview": "[2026-10-12 14:00:00] Evaluating SmolLM2-1.7B lightweight sub-3B model.",
       "rank": 11
     }

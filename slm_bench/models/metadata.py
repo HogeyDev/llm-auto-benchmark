@@ -54,11 +54,30 @@ def extract_params_from_name(name: str) -> Optional[float]:
     return None
 
 
+def estimate_model_ram_gb(param_count_b: Optional[float], quantization: str) -> Optional[float]:
+    """Estimate RAM or VRAM footprint in GB based on parameters and quantization."""
+    if not param_count_b:
+        return None
+    q = (quantization or "").upper()
+    if any(k in q for k in ["Q4", "4BIT", "AWQ", "NF4", "GPTQ"]):
+        multiplier = 0.65
+    elif any(k in q for k in ["Q8", "8BIT"]):
+        multiplier = 1.15
+    elif any(k in q for k in ["FP16", "BF16", "16BIT"]):
+        multiplier = 2.15
+    elif "32BIT" in q or "FP32" in q:
+        multiplier = 4.2
+    else:
+        multiplier = 0.85
+    return round(param_count_b * multiplier, 2)
+
+
 def fetch_hf_model_metadata(
     model_id: str,
     quantization: str = "BF16",
     backend: str = "transformers",
-    token: Optional[str] = None
+    token: Optional[str] = None,
+    model_ram_gb: Optional[float] = None,
 ) -> ModelMetadata:
     """
     Retrieve model metadata from Hugging Face API or infer from name/config.
@@ -118,6 +137,8 @@ def fetch_hf_model_metadata(
     tier = determine_param_tier(param_count_b)
     slug = generate_model_slug(model_id, quantization)
 
+    resolved_ram_gb = model_ram_gb if model_ram_gb is not None else estimate_model_ram_gb(param_count_b, quantization)
+
     return ModelMetadata(
         model_id=model_id,
         model_slug=slug,
@@ -125,6 +146,7 @@ def fetch_hf_model_metadata(
         param_tier=tier,
         architecture=architecture or "CausalLM",
         quantization=quantization,
+        model_ram_gb=resolved_ram_gb,
         context_length=context_length or 8192,
         license=license_name or "unknown",
         backend=backend,

@@ -13,6 +13,7 @@ class HardwareInfo(BaseModel):
     cpu: str = Field(..., description="Processor name")
     cpu_cores: int = Field(..., description="Logical CPU cores count")
     total_ram_gb: float = Field(..., description="Total system RAM in GB")
+    model_ram_gb: Optional[float] = Field(None, description="Size in RAM / VRAM in GB that the model takes up")
     gpu_name: Optional[str] = Field(None, description="Primary GPU model name")
     gpu_count: int = Field(0, description="Number of detected GPUs")
     gpu_vram_gb: Optional[float] = Field(None, description="Primary GPU VRAM in GB")
@@ -28,6 +29,7 @@ class ModelMetadata(BaseModel):
     param_tier: str = Field(..., description="Parameter tier: <3B, 3B-8B, 8B-14B, 14B-35B, 35B-50B, >50B")
     architecture: Optional[str] = Field(None, description="Model architecture type")
     quantization: str = Field("BF16", description="Quantization method (e.g., GGUF_Q4_K_M, AWQ_4BIT, NF4, BF16)")
+    model_ram_gb: Optional[float] = Field(None, description="Size in RAM / VRAM in GB that the model takes up")
     context_length: Optional[int] = Field(None, description="Maximum context window in tokens")
     license: Optional[str] = Field(None, description="Model license")
     backend: str = Field(..., description="Inference backend used for evaluation")
@@ -82,5 +84,7 @@ class BenchmarkResult(BaseModel):
             "instruction": round(self.categories.get("instruction", CategoryScore(category="instruction", weight=0.25, normalized_score=0.0, task_count=0)).normalized_score, 2),
             "tool_calling": round(self.categories.get("tool_calling", CategoryScore(category="tool_calling", weight=0.20, normalized_score=0.0, task_count=0)).normalized_score, 2),
             "gpu": self.hardware.gpu_name or "CPU",
+            "model_ram_gb": self.hardware.model_ram_gb or self.model.model_ram_gb,
+            "notes": self.notes,
             "timestamp": self.timestamp,
         }

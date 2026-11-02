@@ -37,6 +37,9 @@ def generate_pr_markdown_body(result: BenchmarkResult) -> str:
     param_str = f"{m.param_count_b:.2f}B" if m.param_count_b is not None else "Unknown"
     vram_str = f"{hw.gpu_vram_gb:.1f} GB VRAM" if hw.gpu_vram_gb is not None else "N/A"
 
+    model_ram_str = f"{hw.model_ram_gb:.2f} GB" if hw.model_ram_gb is not None else (f"{m.model_ram_gb:.2f} GB" if m.model_ram_gb is not None else "N/A")
+    notes_section = f"\n---\n\n## 📝 Evaluation Notes\n> {result.notes}\n" if result.notes else ""
+
     body = f"""# 📊 Automated SLM Evaluation Submission: {m.model_id}
 
 ### 🌟 Aggregate SLM-Index: **`{result.slm_index:.2f}%`**
@@ -52,6 +55,7 @@ This pull request was automatically submitted by the **SLM-Bench Evaluation Harn
 | **Model Slug** | `{m.model_slug}` |
 | **Parameter Count** | **{param_str}** ({m.param_tier}) |
 | **Quantization** | `{m.quantization}` |
+| **Model RAM / VRAM** | `{model_ram_str}` |
 | **Architecture** | `{m.architecture or 'CausalLM'}` |
 | **Context Length** | `{m.context_length} tokens` |
 | **License** | `{m.license or 'unknown'}` |
@@ -75,10 +79,11 @@ This pull request was automatically submitted by the **SLM-Bench Evaluation Harn
 
 ## 💻 Hardware & Runtime Environment
 - **GPU**: {hw.gpu_name or 'N/A (CPU)'} ({vram_str})
+- **Model RAM Footprint**: {model_ram_str}
 - **CUDA Runtime**: {hw.cuda_version or 'N/A'} | **Driver**: {hw.driver_version or 'N/A'}
 - **CPU**: {hw.cpu} ({hw.cpu_cores} logical cores)
 - **System RAM**: {hw.total_ram_gb:.1f} GB
-- **OS**: {hw.os}
+- **OS**: {hw.os}{notes_section}
 
 ---
 

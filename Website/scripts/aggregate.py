@@ -93,6 +93,18 @@ def normalize_model_entry(data, file_path):
     if not hf_url:
         hf_url = f"https://huggingface.co/{model_id}"
 
+    model_ram = hardware.get("model_ram_gb") or model.get("model_ram_gb") or data.get("model_ram_gb")
+    if model_ram is None and param_count:
+        q = (model.get("quantization") or "").upper()
+        if any(k in q for k in ["Q4", "4BIT", "AWQ", "NF4"]):
+            model_ram = round(param_count * 0.65, 2)
+        elif any(k in q for k in ["Q8", "8BIT"]):
+            model_ram = round(param_count * 1.15, 2)
+        elif any(k in q for k in ["FP16", "BF16"]):
+            model_ram = round(param_count * 2.15, 2)
+        else:
+            model_ram = round(param_count * 0.85, 2)
+
     return {
         "filename": os.path.basename(file_path),
         "file_path": f"data/results/{os.path.basename(file_path)}",
@@ -111,6 +123,7 @@ def normalize_model_entry(data, file_path):
             "param_tier": tier,
             "architecture": model.get("architecture", "Transformer"),
             "quantization": model.get("quantization", "BF16"),
+            "model_ram_gb": model_ram,
             "context_length": model.get("context_length", 32768),
             "license": model.get("license", "Unknown"),
             "backend": model.get("backend", "transformers")
@@ -130,11 +143,13 @@ def normalize_model_entry(data, file_path):
             "cpu": hardware.get("cpu", "N/A"),
             "cpu_cores": hardware.get("cpu_cores", 0),
             "total_ram_gb": hardware.get("total_ram_gb", 0.0),
+            "model_ram_gb": model_ram,
             "os": hardware.get("os", "Linux"),
             "cuda_version": hardware.get("cuda_version", "N/A"),
             "driver_version": hardware.get("driver_version", "N/A")
         },
         "tasks": tasks,
+        "notes": data.get("notes") or "",
         "raw_logs_preview": data.get("raw_logs_preview") or data.get("notes") or "Benchmark run completed successfully."
     }
 

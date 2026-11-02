@@ -10,7 +10,7 @@ from typing import Optional
 from .schema import HardwareInfo
 
 
-def get_hardware_info() -> HardwareInfo:
+def get_hardware_info(model_ram_gb: Optional[float] = None) -> HardwareInfo:
     """Collect host hardware and system specifications."""
     # OS & CPU
     os_name = f"{platform.system()} {platform.release()} ({platform.version()})"
@@ -80,6 +80,7 @@ def get_hardware_info() -> HardwareInfo:
         cpu=cpu_name,
         cpu_cores=cpu_cores,
         total_ram_gb=total_ram_gb,
+        model_ram_gb=model_ram_gb,
         gpu_name=gpu_name,
         gpu_count=gpu_count,
         gpu_vram_gb=gpu_vram_gb,

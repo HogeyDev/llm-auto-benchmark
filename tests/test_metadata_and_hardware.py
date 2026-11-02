@@ -58,3 +58,12 @@ def test_fetch_hf_model_metadata_fallback():
     assert meta.param_tier == "3B-8B"
     assert meta.quantization == "AWQ_4BIT"
     assert meta.backend == "vllm"
+    assert meta.model_ram_gb is not None
+
+
+def test_estimate_model_ram_gb():
+    from slm_bench.models.metadata import estimate_model_ram_gb
+    assert estimate_model_ram_gb(7.0, "GGUF_Q4_K_M") == 4.55
+    assert estimate_model_ram_gb(8.0, "GGUF_Q8_0") == 9.20
+    assert estimate_model_ram_gb(3.0, "BF16") == 6.45
+    assert estimate_model_ram_gb(None, "BF16") is None

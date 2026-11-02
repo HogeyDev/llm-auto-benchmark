@@ -4,6 +4,7 @@ from .mock_backend import MockInferenceBackend
 from .transformers_backend import TransformersBackend
 from .llamacpp_backend import LlamaCppBackend
 from .vllm_backend import VLLMBackend
+from .openai_backend import OpenAICompatibleBackend
 from .registry import get_backend, BACKEND_REGISTRY
 
 __all__ = [
@@ -13,6 +14,7 @@ __all__ = [
     "TransformersBackend",
     "LlamaCppBackend",
     "VLLMBackend",
+    "OpenAICompatibleBackend",
     "get_backend",
     "BACKEND_REGISTRY",
 ]

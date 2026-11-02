@@ -8,6 +8,7 @@ from .mock_backend import MockInferenceBackend
 from .transformers_backend import TransformersBackend
 from .llamacpp_backend import LlamaCppBackend
 from .vllm_backend import VLLMBackend
+from .openai_backend import OpenAICompatibleBackend
 
 
 BACKEND_REGISTRY: Dict[str, Type[BaseInferenceBackend]] = {
@@ -18,6 +19,13 @@ BACKEND_REGISTRY: Dict[str, Type[BaseInferenceBackend]] = {
     "llama_cpp": LlamaCppBackend,
     "gguf": LlamaCppBackend,
     "vllm": VLLMBackend,
+    "openai": OpenAICompatibleBackend,
+    "openai_compatible": OpenAICompatibleBackend,
+    "openai-compatible": OpenAICompatibleBackend,
+    "endpoint": OpenAICompatibleBackend,
+    "ollama": OpenAICompatibleBackend,
+    "lmstudio": OpenAICompatibleBackend,
+    "localai": OpenAICompatibleBackend,
 }
 
 

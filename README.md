@@ -134,6 +134,15 @@ slm-bench evaluate \
   --model-id "Qwen/Qwen2.5-Coder-7B-Instruct" \
   --quantization "GGUF_Q4_K_M" \
   --backend "llamacpp"
+
+# Custom runner / OpenAI-compatible endpoint (Ollama, LM Studio, vLLM, LocalAI)
+# Add exact model RAM footprint and runner notes:
+slm-bench evaluate \
+  --model-id "qwen2.5-coder:7b" \
+  --backend "openai" \
+  --endpoint-url "http://localhost:11434/v1" \
+  --model-ram-gb 4.8 \
+  --notes "Evaluated via Ollama on RTX 3060 12GB (33 layers offloaded to VRAM)"
 ```
 
 ### 3. Evaluate and Submit via Pull Request
@@ -142,6 +151,8 @@ slm-bench evaluate \
   --model-id "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B" \
   --quantization "GGUF_Q4_K_M" \
   --backend "llamacpp" \
+  --model-ram-gb 9.5 \
+  --notes "Tested on Apple M3 Max with Metal acceleration" \
   --submit \
   --github-repo "SeanDolan0/llm-auto-benchmark" \
   --token "$GITHUB_TOKEN"

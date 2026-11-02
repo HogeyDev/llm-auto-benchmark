@@ -723,12 +723,14 @@ function renderTable() {
           <span class="inline-block px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono text-[10px]">${m.architecture}</span>
           <span class="inline-block px-1.5 py-0.2 rounded bg-slate-800/80 text-cyan-300 border border-cyan-900/60 font-mono text-[10px]">${m.quantization}</span>
           <span class="text-slate-500 text-[10px] truncate max-w-[120px]">${m.license}</span>
+          ${item.notes ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-amber-950/40 text-amber-300 border border-amber-800/60 font-mono text-[10px]" title="Evaluation notes attached"><i class="fa-solid fa-note-sticky text-[9px]"></i>Notes</span>` : ''}
         </div>
       </td>
       <td class="px-3 py-3 font-mono text-xs">
         <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700">
           ${m.param_count_b ? m.param_count_b.toFixed(1) + 'B' : 'N/A'}
         </span>
+        ${m.model_ram_gb ? `<span class="block text-[10px] text-emerald-400 font-mono mt-0.5">${m.model_ram_gb.toFixed(1)} GB RAM</span>` : ''}
       </td>
       <td class="px-4 py-3 text-right bg-cyan-950/20 border-x border-slate-800/50">
         <span class="inline-block px-2.5 py-1 rounded-lg text-sm font-extrabold text-cyan-300 bg-cyan-950/80 border border-cyan-700/60 shadow-sm">
@@ -818,8 +820,23 @@ function showModelModal(item) {
   document.getElementById('modal-eval-id').textContent = `ID: ${item.evaluation_id}`;
   document.getElementById('modal-score-overall').textContent = `${s.overall.toFixed(2)}%`;
   document.getElementById('modal-param-count').textContent = `${m.param_count_b}B`;
+
+  const modelRam = m.model_ram_gb || hw.model_ram_gb;
+  document.getElementById('modal-model-ram').textContent = modelRam ? `${modelRam.toFixed(1)} GB` : 'N/A';
+  document.getElementById('modal-hw-model-ram').textContent = modelRam ? `${modelRam.toFixed(2)} GB RAM/VRAM` : 'N/A';
+
   document.getElementById('modal-architecture').textContent = m.architecture || 'CausalLM';
   document.getElementById('modal-license').textContent = m.license || 'Open';
+
+  // Notes section
+  const notesContainer = document.getElementById('modal-notes-section');
+  const notesText = document.getElementById('modal-notes-text');
+  if (item.notes && item.notes.trim()) {
+    notesText.textContent = item.notes;
+    notesContainer.classList.remove('hidden');
+  } else {
+    notesContainer.classList.add('hidden');
+  }
 
   // Submitter details
   document.getElementById('modal-sub-name').textContent = item.submitter?.name || 'Open Contributor';
@@ -974,6 +991,10 @@ function showCompareModal() {
           ${selectedModels.map(m => `<td class="p-3 font-mono">${m.model.param_count_b}B (${m.model.param_tier})</td>`).join('')}
         </tr>
         <tr>
+          <td class="p-3 font-semibold text-slate-300">Model RAM / VRAM</td>
+          ${selectedModels.map(m => `<td class="p-3 font-mono text-emerald-400 font-semibold">${m.model.model_ram_gb ? m.model_ram_gb.toFixed(1) + ' GB' : (m.hardware?.model_ram_gb ? m.hardware.model_ram_gb.toFixed(1) + ' GB' : 'N/A')}</td>`).join('')}
+        </tr>
+        <tr>
           <td class="p-3 font-semibold text-slate-300">Quantization</td>
           ${selectedModels.map(m => `<td class="p-3 font-mono text-cyan-300">${m.model.quantization}</td>`).join('')}
         </tr>
@@ -992,6 +1013,10 @@ function showCompareModal() {
         <tr>
           <td class="p-3 font-semibold text-slate-300">GPU Hardware</td>
           ${selectedModels.map(m => `<td class="p-3 text-slate-300">${m.hardware?.gpu_name || 'N/A'}</td>`).join('')}
+        </tr>
+        <tr>
+          <td class="p-3 font-semibold text-slate-300">Evaluation Notes</td>
+          ${selectedModels.map(m => `<td class="p-3 text-xs text-slate-300 italic">${m.notes || 'None'}</td>`).join('')}
         </tr>
       </tbody>
     </table>

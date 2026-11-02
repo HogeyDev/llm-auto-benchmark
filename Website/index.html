@@ -489,7 +489,7 @@
         <!-- Tab 1: Scores & Tasks -->
         <div id="tab-overview" class="modal-tab-content space-y-5">
           <!-- Overall Summary Cards -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div class="bg-[#050811] p-3 rounded-xl border border-slate-800">
               <span class="text-slate-400 text-xs">Overall Score</span>
               <div id="modal-score-overall" class="text-2xl font-extrabold text-cyan-400 mt-1">--</div>
@@ -499,6 +499,10 @@
               <div id="modal-param-count" class="text-2xl font-extrabold text-white mt-1">--</div>
             </div>
             <div class="bg-[#050811] p-3 rounded-xl border border-slate-800">
+              <span class="text-slate-400 text-xs">RAM Footprint</span>
+              <div id="modal-model-ram" class="text-2xl font-extrabold text-emerald-400 mt-1">--</div>
+            </div>
+            <div class="bg-[#050811] p-3 rounded-xl border border-slate-800">
               <span class="text-slate-400 text-xs">Architecture</span>
               <div id="modal-architecture" class="text-base font-bold text-slate-200 mt-2 truncate">--</div>
             </div>
@@ -506,6 +510,14 @@
               <span class="text-slate-400 text-xs">License</span>
               <div id="modal-license" class="text-base font-bold text-slate-200 mt-2 truncate">--</div>
             </div>
+          </div>
+
+          <!-- Evaluation Notes Section (if available) -->
+          <div id="modal-notes-section" class="bg-indigo-950/20 border border-indigo-900/60 p-4 rounded-xl hidden space-y-1">
+            <h5 class="font-bold text-indigo-300 uppercase tracking-wider text-xs flex items-center">
+              <i class="fa-solid fa-note-sticky text-amber-400 mr-2"></i> Evaluation Notes & Runner Configuration
+            </h5>
+            <p id="modal-notes-text" class="text-xs text-slate-300 leading-relaxed font-sans"></p>
           </div>
 
           <!-- Benchmark Breakdown Progress Bars -->
@@ -526,6 +538,7 @@
               </h5>
               <div><span class="text-slate-400">GPU Model:</span> <strong id="modal-hw-gpu" class="text-white">N/A</strong></div>
               <div><span class="text-slate-400">GPU VRAM:</span> <strong id="modal-hw-vram" class="text-white">N/A</strong></div>
+              <div><span class="text-slate-400">Model RAM / VRAM:</span> <strong id="modal-hw-model-ram" class="text-emerald-400">N/A</strong></div>
               <div><span class="text-slate-400">CUDA / Driver:</span> <strong id="modal-hw-cuda" class="text-white">N/A</strong></div>
               <div><span class="text-slate-400">Inference Backend:</span> <strong id="modal-hw-backend" class="text-white">N/A</strong></div>
             </div>
@@ -536,7 +549,7 @@
               </h5>
               <div><span class="text-slate-400">CPU:</span> <strong id="modal-hw-cpu" class="text-white">N/A</strong></div>
               <div><span class="text-slate-400">CPU Cores:</span> <strong id="modal-hw-cores" class="text-white">N/A</strong></div>
-              <div><span class="text-slate-400">Host RAM:</span> <strong id="modal-hw-ram" class="text-white">N/A</strong></div>
+              <div><span class="text-slate-400">Host Total RAM:</span> <strong id="modal-hw-ram" class="text-white">N/A</strong></div>
               <div><span class="text-slate-400">Operating System:</span> <strong id="modal-hw-os" class="text-white">N/A</strong></div>
             </div>
           </div>
@@ -683,15 +696,17 @@ cd llm-auto-benchmark</span>
               <span class="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-700 flex items-center justify-center text-xs">2</span>
               <span>Run the Evaluation on Your Local Hardware</span>
             </div>
-            <p class="text-slate-400 pl-8">Run the evaluation harness on your consumer GPU, Mac, or CPU. It automatically detects and captures your host hardware telemetry:</p>
-            <div class="pl-8">
+            <p class="text-slate-400 pl-8">Run the evaluation harness on your consumer GPU, Mac, or CPU. You can evaluate directly or connect to custom software via local OpenAI-compatible endpoints (Ollama, LM Studio, vLLM, etc.):</p>
+            <div class="pl-8 space-y-2">
               <pre class="bg-black/60 p-3 rounded-lg border border-slate-800 font-mono text-cyan-300 text-xs flex justify-between items-center">
-<span># Example running evaluation on everyday hardware (GGUF / llama.cpp):
+<span># Example: evaluate via Ollama / LM Studio / custom local endpoint:
 slm-bench evaluate \
-  --model-id "Qwen/Qwen2.5-7B-Instruct" \
-  --quantization "GGUF_Q4_K_M" \
-  --backend llamacpp</span>
-                <button onclick="navigator.clipboard.writeText('slm-bench evaluate --model-id &quot;Qwen/Qwen2.5-7B-Instruct&quot; --quantization &quot;GGUF_Q4_K_M&quot; --backend llamacpp')" class="text-slate-500 hover:text-white ml-2"><i class="fa-regular fa-copy"></i></button>
+  --model-id "qwen2.5:7b" \
+  --backend openai \
+  --endpoint-url "http://localhost:11434/v1" \
+  --model-ram-gb 4.5 \
+  --notes "Ran via Ollama on RTX 3060 12GB"</span>
+                <button onclick="navigator.clipboard.writeText('slm-bench evaluate --model-id &quot;qwen2.5:7b&quot; --backend openai --endpoint-url &quot;http://localhost:11434/v1&quot; --model-ram-gb 4.5 --notes &quot;Ran via Ollama on RTX 3060 12GB&quot;')" class="text-slate-500 hover:text-white ml-2"><i class="fa-regular fa-copy"></i></button>
               </pre>
             </div>
           </div>

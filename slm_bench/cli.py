@@ -31,10 +31,11 @@ app = typer.Typer(
 def info(
     model_id: Optional[str] = typer.Option(None, "--model-id", "-m", help="Hugging Face model repository ID to inspect"),
     quantization: str = typer.Option("BF16", "--quantization", "-q", help="Quantization tag"),
+    model_ram_gb: Optional[float] = typer.Option(None, "--model-ram-gb", "--ram-gb", help="Size in RAM / VRAM in GB that the model takes up"),
 ):
     """Display host hardware specifications and inspect Hugging Face model metadata."""
     setup_logger()
-    hw = get_hardware_info()
+    hw = get_hardware_info(model_ram_gb=model_ram_gb)
 
     hw_table = Table(title="[Host Hardware & Runtime Environment]", show_header=True, header_style="bold magenta")
     hw_table.add_column("Property", style="dim")
@@ -42,6 +43,8 @@ def info(
     hw_table.add_row("Operating System", hw.os)
     hw_table.add_row("CPU", f"{hw.cpu} ({hw.cpu_cores} logical cores)")
     hw_table.add_row("System RAM", f"{hw.total_ram_gb} GB")
+    if hw.model_ram_gb:
+        hw_table.add_row("Model RAM Footprint", f"{hw.model_ram_gb} GB")
     hw_table.add_row("GPU Model", hw.gpu_name or "None detected (CPU mode)")
     hw_table.add_row("GPU VRAM", f"{hw.gpu_vram_gb} GB" if hw.gpu_vram_gb else "N/A")
     hw_table.add_row("CUDA Version", hw.cuda_version or "N/A")
@@ -49,13 +52,14 @@ def info(
     console.print(hw_table)
 
     if model_id:
-        meta = fetch_hf_model_metadata(model_id, quantization=quantization)
+        meta = fetch_hf_model_metadata(model_id, quantization=quantization, model_ram_gb=model_ram_gb)
         m_table = Table(title=f"[Model Metadata: {model_id}]", show_header=True, header_style="bold green")
         m_table.add_column("Field", style="dim")
         m_table.add_column("Value", style="bold yellow")
         m_table.add_row("Model Slug", meta.model_slug)
         m_table.add_row("Parameter Count", f"{meta.param_count_b:.2f}B" if meta.param_count_b else "Unknown")
         m_table.add_row("Parameter Tier", meta.param_tier)
+        m_table.add_row("RAM / VRAM Footprint", f"{meta.model_ram_gb:.2f} GB" if meta.model_ram_gb else "Unknown")
         m_table.add_row("Architecture", meta.architecture or "Unknown")
         m_table.add_row("Context Window", f"{meta.context_length} tokens" if meta.context_length else "Unknown")
         m_table.add_row("License", meta.license or "Unknown")
@@ -66,7 +70,10 @@ def info(
 def evaluate(
     model_id: str = typer.Option(..., "--model-id", "--repo-id", "-m", help="Hugging Face repo ID or local model path"),
     quantization: str = typer.Option("BF16", "--quantization", "-q", help="Quantization: BF16, FP16, AWQ_4BIT, GGUF_Q4_K_M, NF4"),
-    backend: str = typer.Option("mock", "--backend", "-b", help="Inference backend: mock, transformers, llamacpp, vllm"),
+    backend: str = typer.Option("mock", "--backend", "-b", help="Inference backend: mock, transformers, llamacpp, vllm, openai (Ollama / LM Studio)"),
+    endpoint_url: str = typer.Option("http://localhost:11434/v1", "--endpoint-url", "--endpoint", "--base-url", help="OpenAI-compatible server endpoint URL (e.g. http://localhost:11434/v1, http://localhost:1234/v1, or custom runner)"),
+    api_key: str = typer.Option("EMPTY", "--api-key", envvar="OPENAI_API_KEY", help="API key for custom or remote endpoint if required"),
+    model_ram_gb: Optional[float] = typer.Option(None, "--model-ram-gb", "--ram-gb", help="Size in RAM / VRAM in GB that the model takes up"),
     output_dir: str = typer.Option("data/results", "--output-dir", "-o", help="Target directory for output JSON"),
     sample_limit: Optional[int] = typer.Option(None, "--sample-limit", "-n", help="Limit samples per task (for testing)"),
     tasks: Optional[str] = typer.Option(None, "--tasks", "-t", help="Comma-separated list of tasks to run (reasoning, coding, instruction, tool_calling)"),
@@ -75,23 +82,34 @@ def evaluate(
     token: Optional[str] = typer.Option(None, "--token", envvar="GITHUB_TOKEN", help="GitHub Personal Access Token"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Dry-run mode: do not push Git commits or open real PRs"),
     allow_over_50b: bool = typer.Option(True, "--allow-over-50b", help="Deprecated flag maintained for backwards compatibility"),
-    notes: Optional[str] = typer.Option(None, "--notes", help="Optional notes to store in metadata"),
+    notes: Optional[str] = typer.Option(None, "--notes", help="Optional notes on runner configuration, offloading, or execution details"),
 ):
     """Run benchmark evaluation suite on a single model and save standardized JSON."""
     setup_logger()
     logger.info(f"Initiating evaluation for [bold green]{model_id}[/bold green] using [cyan]{backend}[/cyan] backend...")
 
     # 1. Hardware and Model Metadata
-    hw = get_hardware_info()
-    meta = fetch_hf_model_metadata(model_id, quantization=quantization, backend=backend)
+    meta = fetch_hf_model_metadata(model_id, quantization=quantization, backend=backend, model_ram_gb=model_ram_gb)
+    hw = get_hardware_info(model_ram_gb=meta.model_ram_gb)
 
     # 2. Model Telemetry Logging (Small Local AI)
     if meta.param_count_b:
         logger.info(f"Model '{model_id}' evaluated at {meta.param_count_b:.1f}B parameters (class: Small Local AI).")
+    if meta.model_ram_gb:
+        logger.info(f"Model RAM / VRAM footprint: [bold cyan]{meta.model_ram_gb:.2f} GB[/bold cyan]")
+    if notes:
+        logger.info(f"Evaluation Notes: [italic]{notes}[/italic]")
 
     # 3. Instantiate Backend
     try:
-        engine = get_backend(backend, model_id=model_id, quantization=quantization)
+        engine = get_backend(
+            backend,
+            model_id=model_id,
+            quantization=quantization,
+            endpoint_url=endpoint_url,
+            api_key=api_key,
+            model_ram_gb=meta.model_ram_gb,
+        )
     except Exception as e:
         logger.error(f"Failed to initialize backend '{backend}': {e}")
         raise typer.Exit(code=1)
@@ -164,6 +182,10 @@ def evaluate(
 def batch(
     batch_file: Path = typer.Option(..., "--batch-file", "-f", help="Text file with model IDs (one per line) or JSON file"),
     backend: str = typer.Option("mock", "--backend", "-b", help="Inference backend"),
+    endpoint_url: str = typer.Option("http://localhost:11434/v1", "--endpoint-url", "--endpoint", "--base-url", help="OpenAI-compatible endpoint URL"),
+    api_key: str = typer.Option("EMPTY", "--api-key", envvar="OPENAI_API_KEY", help="API key for endpoint"),
+    model_ram_gb: Optional[float] = typer.Option(None, "--model-ram-gb", "--ram-gb", help="Size in RAM / VRAM in GB that the model takes up"),
+    notes: Optional[str] = typer.Option(None, "--notes", help="Optional notes on batch evaluation environment or runner"),
     quantization: str = typer.Option("BF16", "--quantization", "-q", help="Quantization method"),
     output_dir: str = typer.Option("data/results", "--output-dir", "-o", help="Target results directory"),
     sample_limit: Optional[int] = typer.Option(None, "--sample-limit", "-n", help="Sample limit per task"),
@@ -194,6 +216,9 @@ def batch(
             model_id=model_id,
             quantization=quantization,
             backend=backend,
+            endpoint_url=endpoint_url,
+            api_key=api_key,
+            model_ram_gb=model_ram_gb,
             output_dir=output_dir,
             sample_limit=sample_limit,
             tasks=None,
@@ -202,7 +227,7 @@ def batch(
             token=token,
             dry_run=dry_run,
             allow_over_50b=True,
-            notes="Batch evaluation",
+            notes=notes or "Batch evaluation",
         )
         results.append(res)
 

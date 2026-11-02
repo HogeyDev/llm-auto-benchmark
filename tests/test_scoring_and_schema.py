@@ -22,6 +22,7 @@ def test_benchmark_result_schema_serialization():
         cpu="Intel i7",
         cpu_cores=8,
         total_ram_gb=16.0,
+        model_ram_gb=3.8,
     )
     task_m = TaskMetric(
         task_id="slm_reasoning_cot",
@@ -47,6 +48,7 @@ def test_benchmark_result_schema_serialization():
         tasks={"slm_reasoning_cot": task_m},
         categories={"reasoning": cat_s},
         slm_index=80.0,
+        notes="Evaluated via local Ollama endpoint",
     )
 
     # Test JSON serialization & roundtrip
@@ -55,11 +57,15 @@ def test_benchmark_result_schema_serialization():
     assert reloaded.evaluation_id == "eval-1234"
     assert reloaded.slm_index == 80.0
     assert reloaded.model.model_slug == "model-3B-BF16"
+    assert reloaded.notes == "Evaluated via local Ollama endpoint"
+    assert reloaded.hardware.model_ram_gb == 3.8
 
     # Test summary dict
     summary = result.to_summary_dict()
     assert summary["slm_index"] == 80.0
     assert summary["params_b"] == 3.1
+    assert summary["model_ram_gb"] == 3.8
+    assert summary["notes"] == "Evaluated via local Ollama endpoint"
 
 
 def test_suite_composite_index_calculation():
