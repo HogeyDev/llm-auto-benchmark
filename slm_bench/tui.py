@@ -45,6 +45,7 @@ from .models.metadata import fetch_hf_model_metadata
 from .models.memory_detector import auto_detect_model_ram_gb
 from .backends.registry import get_backend
 from .benchmarks.suite import BenchmarkSuite
+from .benchmarks.registry import EVALUATION_PROFILES, get_profile_tasks
 from .submission.git_manager import GitSubmissionManager
 from .submission.pr_manager import PullRequestManager
 
@@ -252,12 +253,15 @@ class HelpModalScreen(ModalScreen):
                 "  • [bold yellow]c[/bold yellow] : Clear generation stream log\n"
                 "  • [bold yellow]?[/bold yellow] or [bold yellow]h[/bold yellow] : Show this help screen\n"
                 "  • [bold yellow]q[/bold yellow] : Quit application\n\n"
-                "[bold cyan]Scoring Weights (SLM-Index):[/bold cyan]\n"
-                "  • Coding (Agentic): 30%\n"
-                "  • Reasoning & Math: 25%\n"
-                "  • Instruction Following: 25%\n"
-                "  • Tool Calling: 20%\n\n"
-                "[dim]Scores are saved to data/results/<slug>.json and are ready for PR submission.[/dim]"
+                "[bold cyan]Evaluation Profiles:[/bold cyan]\n"
+                "  • [bold yellow]Standard[/bold yellow] (Default): 8 tasks (MMLU-Pro, GSM8K, EvalPlus, BFCL, CoT, etc.)\n"
+                "  • [bold yellow]Quick[/bold yellow]: 4 core tasks (5 samples each) for rapid smoke testing\n"
+                "  • [bold yellow]Extended[/bold yellow]: 15 suites (GPQA, BBH, MATH-500, LiveCodeBench, IFBench, RULER, Safety)\n\n"
+                "[bold cyan]Scoring Tracks:[/bold cyan]\n"
+                "  • [bold green]General Intelligence (SLM-Index)[/bold green]: Coding (30%), Reasoning (25%), Instruction (25%), Tools (20%)\n"
+                "  • [bold green]Coding & Agentic Index[/bold green]: 60% Code synthesis + 40% Tool execution\n"
+                "  • [bold green]Local Efficiency[/bold green]: Score-per-GB RAM footprint + generation tokens/sec\n\n"
+                "[dim]Scores are saved to Website/data/results/<slug>.json and are ready for PR submission.[/dim]"
             )
             yield Static(help_text)
             with Horizontal(classes="modal-actions"):
@@ -421,19 +425,32 @@ class SLMBenchTUI(App):
                     id="select-effort",
                 )
 
+                yield Label("Evaluation Profile:", classes="section-label")
+                yield Select(
+                    [
+                        ("Standard (Default - 8 Benchmarks)", "standard"),
+                        ("Quick (Smoke Check - 4 Core Tasks)", "quick"),
+                        ("Extended (Full Suite - 15 Academic Adapters)", "extended"),
+                        ("Custom Selection", "custom"),
+                    ],
+                    value="standard",
+                    id="select-profile",
+                )
+
                 yield Label("Sample Limit:", classes="section-label")
                 yield Select(
                     [
+                        ("Profile Default", "default"),
                         ("1 sample (Quick test)", "1"),
                         ("3 samples (Fast check)", "3"),
                         ("5 samples (Standard)", "5"),
                         ("All samples (Full suite)", "all"),
                     ],
-                    value="1",
+                    value="default",
                     id="select-limit",
                 )
 
-                yield Label("Evaluation Tasks:", classes="section-label")
+                yield Label("Custom Evaluation Tasks:", classes="section-label")
                 yield Checkbox("Reasoning & Math", value=True, id="chk-reasoning", classes="task-checkbox")
                 yield Checkbox("Agentic Coding", value=True, id="chk-coding", classes="task-checkbox")
                 yield Checkbox("Instruction Following", value=True, id="chk-instruction", classes="task-checkbox")
@@ -674,20 +691,24 @@ class SLMBenchTUI(App):
         effort = None if effort_val == "none" else effort_val
 
         limit_val = str(self.query_one("#select-limit", Select).value)
-        sample_limit = None if limit_val == "all" else int(limit_val)
+        sample_limit = None if limit_val in ("all", "default") else int(limit_val)
 
-        selected_tasks = []
-        if self.query_one("#chk-reasoning", Checkbox).value:
-            selected_tasks.append("reasoning")
-        if self.query_one("#chk-coding", Checkbox).value:
-            selected_tasks.append("coding")
-        if self.query_one("#chk-instruction", Checkbox).value:
-            selected_tasks.append("instruction")
-        if self.query_one("#chk-tools", Checkbox).value:
-            selected_tasks.append("tool_calling")
+        profile_val = str(self.query_one("#select-profile", Select).value)
+        profile = None if profile_val == "custom" else profile_val
 
-        if not selected_tasks:
-            selected_tasks = ["reasoning"]
+        selected_tasks = None
+        if profile_val == "custom":
+            selected_tasks = []
+            if self.query_one("#chk-reasoning", Checkbox).value:
+                selected_tasks.append("reasoning")
+            if self.query_one("#chk-coding", Checkbox).value:
+                selected_tasks.append("coding")
+            if self.query_one("#chk-instruction", Checkbox).value:
+                selected_tasks.append("instruction")
+            if self.query_one("#chk-tools", Checkbox).value:
+                selected_tasks.append("tool_calling")
+            if not selected_tasks:
+                selected_tasks = ["reasoning"]
 
         # Run worker
         self.run_eval_worker(
@@ -697,6 +718,7 @@ class SLMBenchTUI(App):
             endpoint_url=endpoint_url,
             api_key=api_key,
             reasoning_effort=effort,
+            profile=profile,
             sample_limit=sample_limit,
             selected_tasks=selected_tasks,
         )
@@ -723,8 +745,9 @@ class SLMBenchTUI(App):
         endpoint_url: str,
         api_key: str,
         reasoning_effort: Optional[str],
+        profile: Optional[str],
         sample_limit: Optional[int],
-        selected_tasks: List[str],
+        selected_tasks: Optional[List[str]],
     ) -> None:
         """Background thread worker executing evaluation suite with cooperative cancellation."""
         try:
@@ -783,13 +806,15 @@ class SLMBenchTUI(App):
             )
 
             # 3. Setup hooks for suite execution
-            total_tasks_count = len(selected_tasks)
+            suite = BenchmarkSuite()
+            resolved_tasks = suite.resolve_tasks(selected_tasks=selected_tasks, profile=profile)
+            total_tasks_count = len(resolved_tasks)
             current_task_idx = [0]
 
             def on_task_start(task_id: str, category: str):
                 current_task_idx[0] += 1
                 msg = f"Task [{current_task_idx[0]}/{total_tasks_count}]: [bold cyan]{task_id}[/bold cyan] ({category.title()})"
-                pct = int((current_task_idx[0] - 1) / total_tasks_count * 100)
+                pct = int((current_task_idx[0] - 1) / max(1, total_tasks_count) * 100)
                 self.call_from_thread(self._update_task_progress, msg, pct)
                 self.call_from_thread(self._log_task_header, task_id, category)
 
@@ -799,12 +824,12 @@ class SLMBenchTUI(App):
             def on_task_complete(task_id: str, metric: Any):
                 self.call_from_thread(self._add_metric_row, task_id, metric)
 
-            suite = BenchmarkSuite()
             result = suite.run_suite(
                 backend=backend,
                 model_meta=meta,
                 hardware_info=hw,
                 selected_tasks=selected_tasks,
+                profile=profile,
                 sample_limit=sample_limit,
                 notes=notes,
                 on_task_start=on_task_start,
@@ -817,8 +842,12 @@ class SLMBenchTUI(App):
             if self.cancel_event.is_set():
                 raise InterruptedError("Evaluation cancelled during benchmark execution.")
 
-            # 4. Save result
+            # 4. Save result (prefer Website/data/results if exists, else data/results)
             out_dir = Path("data/results")
+            if Path("Website/data/results").exists():
+                out_dir = Path("Website/data/results")
+            elif Path("website/data/results").exists():
+                out_dir = Path("website/data/results")
             out_dir.mkdir(parents=True, exist_ok=True)
             res_file = out_dir / f"{meta.model_slug}.json"
             res_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
@@ -941,7 +970,15 @@ class SLMBenchTUI(App):
         log = self.query_one("#stream-log", RichLog)
         log.write(f"[bold green]════════════════════════════════════════════════════════════════════════════[/bold green]")
         log.write(f"[bold green]✓ BENCHMARK COMPLETED SUCCESSFULLY![/bold green]")
-        log.write(f"Aggregate SLM-Index Score: [bold yellow]{result.slm_index:.2f}%[/bold yellow]")
+        log.write(f"Evaluation Profile: [bold yellow]{(result.profile or 'standard').upper()}[/bold yellow]")
+        log.write(f"General Intelligence (SLM-Index): [bold yellow]{result.slm_index:.2f}%[/bold yellow]")
+        if result.coding_agentic_index is not None:
+            log.write(f"Coding & Agentic Index: [bold cyan]{result.coding_agentic_index:.2f}%[/bold cyan]")
+        if result.local_efficiency:
+            eff = result.local_efficiency
+            pts_gb = eff.get("score_per_gb", "N/A")
+            tps = eff.get("tokens_per_sec", "N/A")
+            log.write(f"Local Efficiency: [bold magenta]{pts_gb} pts/GB RAM | {tps} tok/s[/bold magenta]")
         log.write(f"Standardized Result JSON: [bold cyan]{file_path}[/bold cyan]")
         log.write(f"[bold green]════════════════════════════════════════════════════════════════════════════[/bold green]")
 

@@ -25,6 +25,7 @@ def test_tui_initialization_and_mounting():
             assert "sk_live_" not in app.default_api_key
             assert app.query_one("#input-model", Input).value == "meta-llama/Llama-3.2-3B-Instruct"
             assert app.query_one("#input-quant", Input).value == "BF16"
+            assert app.query_one("#select-profile", Select).value == "standard"
             assert app.query_one("#btn-run", Button) is not None
             assert app.query_one("#btn-stop", Button).disabled is True
             assert app.query_one("#btn-test-conn", Button) is not None
@@ -32,6 +33,19 @@ def test_tui_initialization_and_mounting():
             assert app.query_one("#live-stream-box") is not None
             assert app.query_one("#stream-log") is not None
             assert app.query_one("#results-table", DataTable) is not None
+
+    asyncio.run(_test())
+
+
+def test_tui_profile_selection():
+    """Verify selecting an evaluation profile in the TUI."""
+    async def _test():
+        app = SLMBenchTUI()
+        async with app.run_test() as pilot:
+            profile_sel = app.query_one("#select-profile", Select)
+            profile_sel.value = "extended"
+            await pilot.pause()
+            assert app.query_one("#select-profile", Select).value == "extended"
 
     asyncio.run(_test())
 
