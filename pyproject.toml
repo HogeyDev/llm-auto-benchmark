@@ -36,6 +36,7 @@ vllm = [
 ]
 test = [
     "pytest>=7.0.0",
+    "anyio>=4.0.0",
 ]
 all = [
     "torch>=2.0.0",
@@ -44,6 +45,7 @@ all = [
     "bitsandbytes>=0.43.0",
     "llama-cpp-python>=0.2.70",
     "pytest>=7.0.0",
+    "anyio>=4.0.0",
 ]
 
 [project.scripts]
