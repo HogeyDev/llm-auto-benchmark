@@ -1,0 +1,73 @@
+{
+  "evaluation_id": "eval-gemma2-9b-it-bf16",
+  "timestamp": "2026-10-25T11:40:00Z",
+  "submitter": {
+    "name": "Elena Rostova",
+    "github_handle": "elena-ml",
+    "affiliation": "EuroLLM Working Group"
+  },
+  "model": {
+    "model_id": "google/gemma-2-9b-it",
+    "model_slug": "gemma-2-9b-it-BF16",
+    "hf_url": "https://huggingface.co/google/gemma-2-9b-it",
+    "param_count_b": 9.24,
+    "param_tier": "7B\u201314B",
+    "architecture": "Gemma2ForCausalLM",
+    "quantization": "BF16",
+    "context_length": 8192,
+    "license": "Gemma Terms of Use",
+    "backend": "vLLM"
+  },
+  "hardware": {
+    "gpu_name": "NVIDIA A100-SXM4-80GB",
+    "gpu_count": 1,
+    "gpu_vram_gb": 80.0,
+    "cpu": "AMD EPYC 7742",
+    "cpu_cores": 32,
+    "total_ram_gb": 128.0,
+    "os": "Ubuntu 22.04 LTS",
+    "cuda_version": "12.4",
+    "driver_version": "550.54"
+  },
+  "summary_scores": {
+    "overall_score": 81.85,
+    "gsm8k": 84.2,
+    "humaneval": 74.4,
+    "arc": 88.6,
+    "ifeval": 84.1,
+    "tool_calling": 76.5
+  },
+  "tasks": {
+    "gsm8k": {
+      "display_name": "GSM8K",
+      "score": 84.2,
+      "passed_samples": 1111,
+      "total_samples": 1319
+    },
+    "humaneval": {
+      "display_name": "HumanEval",
+      "score": 74.4,
+      "passed_samples": 122,
+      "total_samples": 164
+    },
+    "arc": {
+      "display_name": "ARC Challenge",
+      "score": 88.6,
+      "passed_samples": 1038,
+      "total_samples": 1172
+    },
+    "ifeval": {
+      "display_name": "IFEval",
+      "score": 84.1,
+      "passed_samples": 455,
+      "total_samples": 541
+    },
+    "tool_calling": {
+      "display_name": "Tool Calling",
+      "score": 76.5,
+      "passed_samples": 230,
+      "total_samples": 300
+    }
+  },
+  "raw_logs_preview": "[2026-10-25 11:20:00] Executed vLLM benchmark on Google Gemma 2 9B IT in BF16 precision."
+}

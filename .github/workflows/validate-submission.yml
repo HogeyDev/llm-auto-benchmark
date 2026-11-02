@@ -1,0 +1,106 @@
+name: Validate Benchmark Submission
+
+on:
+  pull_request:
+    paths:
+      - 'website/data/results/**.json'
+      - 'Website/data/results/**.json'
+      - 'data/results/**.json'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate Schema & Benchmark Limits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate Submission JSON Files
+        run: |
+          python - << 'EOF'
+          import json, glob, sys
+          from pathlib import Path
+
+          files = (
+              glob.glob("website/data/results/*.json")
+              + glob.glob("Website/data/results/*.json")
+              + glob.glob("data/results/*.json")
+          )
+          # Deduplicate while preserving order
+          seen = set()
+          deduped_files = []
+          for f in files:
+              norm = Path(f).as_posix().lower()
+              if norm not in seen and not norm.endswith("index.json"):
+                  seen.add(norm)
+                  deduped_files.append(f)
+
+          if not deduped_files:
+              print("[INFO] No result files found to validate.")
+              sys.exit(0)
+
+          print(f"[INFO] Validating {len(deduped_files)} benchmark files...")
+
+          for filepath in deduped_files:
+              print(f"Checking: {filepath}")
+              try:
+                  with open(filepath, "r", encoding="utf-8") as f:
+                      data = json.load(f)
+              except Exception as e:
+                  print(f"❌ JSON Parse Error in {filepath}: {e}")
+                  sys.exit(1)
+
+              model = data.get("model", {})
+              model_id = model.get("model_id")
+              if not model_id:
+                  print(f"❌ Missing 'model.model_id' in {filepath}")
+                  sys.exit(1)
+
+              params = model.get("param_count_b", 0.0)
+              try:
+                  params = float(params)
+              except (ValueError, TypeError):
+                  print(f"❌ Invalid param_count_b: {params}")
+                  sys.exit(1)
+
+              if params > 50.0:
+                  print(f"❌ Parameter count ({params}B) exceeds the 50B SLM ceiling in {filepath}")
+                  sys.exit(1)
+
+              # Validate hardware
+              hw = data.get("hardware")
+              if not hw:
+                  print(f"❌ Missing 'hardware' specification object in {filepath}")
+                  sys.exit(1)
+
+              # Validate scores
+              scores = data.get("summary_scores", {})
+              tasks = data.get("tasks", {})
+              categories = data.get("categories", {})
+              slm_idx = data.get("slm_index")
+
+              if not scores and not tasks and not categories and slm_idx is None:
+                  print(f"❌ No benchmark scores or tasks recorded in {filepath}")
+                  sys.exit(1)
+
+              print(f"✅ PASS: {model_id} ({params}B) - Valid format")
+
+          print("\n🎉 All benchmark submissions passed automated schema verification!")
+          EOF
+
+      - name: Test Aggregator Compilation
+        run: |
+          if [ -d "website/scripts" ]; then
+            python website/scripts/aggregate.py
+          elif [ -d "Website/scripts" ]; then
+            python Website/scripts/aggregate.py
+          elif [ -f "scripts/aggregate.py" ]; then
+            python scripts/aggregate.py
+          fi
+          echo "✅ Aggregator ran successfully."

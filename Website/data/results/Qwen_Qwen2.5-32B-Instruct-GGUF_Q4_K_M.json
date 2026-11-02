@@ -1,0 +1,93 @@
+{
+  "evaluation_id": "eval-qwen25-32b-20261028",
+  "timestamp": "2026-10-28T09:15:33Z",
+  "submitter": {
+    "name": "Sarah Lin",
+    "github_handle": "slin-openllm",
+    "affiliation": "Hugging Face Community"
+  },
+  "model": {
+    "model_id": "Qwen/Qwen2.5-32B-Instruct",
+    "model_slug": "Qwen2.5-32B-Instruct-GGUF_Q4_K_M",
+    "hf_url": "https://huggingface.co/Qwen/Qwen2.5-32B-Instruct",
+    "param_count_b": 32.5,
+    "param_tier": "14B\u201332B",
+    "architecture": "Qwen2ForCausalLM",
+    "quantization": "GGUF Q4_K_M",
+    "context_length": 131072,
+    "license": "Apache-2.0",
+    "backend": "vLLM"
+  },
+  "hardware": {
+    "gpu_name": "NVIDIA RTX 6000 Ada Generation",
+    "gpu_count": 1,
+    "gpu_vram_gb": 48.0,
+    "cpu": "Intel Xeon w9-3495X 56-Cores",
+    "cpu_cores": 56,
+    "total_ram_gb": 128.0,
+    "os": "Red Hat Enterprise Linux 9.4",
+    "cuda_version": "12.3",
+    "driver_version": "545.23.08"
+  },
+  "summary_scores": {
+    "overall_score": 86.9,
+    "gsm8k": 91.6,
+    "humaneval": 84.8,
+    "arc": 90.1,
+    "ifeval": 85.2,
+    "tool_calling": 81.4
+  },
+  "tasks": {
+    "gsm8k": {
+      "display_name": "GSM8K (Grade School Math)",
+      "category": "Math Reasoning",
+      "score": 91.6,
+      "metric": "strict_acc",
+      "total_samples": 1319,
+      "passed_samples": 1208,
+      "avg_tokens_per_sec": 31.4,
+      "avg_latency_ms": 340.0
+    },
+    "humaneval": {
+      "display_name": "HumanEval (Python Coding)",
+      "category": "Code Generation",
+      "score": 84.8,
+      "metric": "pass@1",
+      "total_samples": 164,
+      "passed_samples": 139,
+      "avg_tokens_per_sec": 29.8,
+      "avg_latency_ms": 380.0
+    },
+    "arc": {
+      "display_name": "ARC Challenge (Reasoning)",
+      "category": "Scientific Reasoning",
+      "score": 90.1,
+      "metric": "acc_norm",
+      "total_samples": 1172,
+      "passed_samples": 1056,
+      "avg_tokens_per_sec": 34.2,
+      "avg_latency_ms": 260.0
+    },
+    "ifeval": {
+      "display_name": "IFEval (Instruction Following)",
+      "category": "Instruction Adherence",
+      "score": 85.2,
+      "metric": "strict_prompt_acc",
+      "total_samples": 541,
+      "passed_samples": 461,
+      "avg_tokens_per_sec": 32.0,
+      "avg_latency_ms": 290.0
+    },
+    "tool_calling": {
+      "display_name": "Tool Calling & Function Execution",
+      "category": "Agentic Tool Use",
+      "score": 81.4,
+      "metric": "schema_and_execution_acc",
+      "total_samples": 300,
+      "passed_samples": 244,
+      "avg_tokens_per_sec": 30.5,
+      "avg_latency_ms": 350.0
+    }
+  },
+  "raw_logs_preview": "[2026-10-28 09:00:00] Initialized vLLM engine with Qwen2.5-32B-Instruct\n[2026-10-28 09:15:30] Full evaluation completed on 5 benchmarks. Average accuracy 86.90%."
+}

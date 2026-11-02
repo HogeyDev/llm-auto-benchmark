@@ -1,0 +1,73 @@
+{
+  "evaluation_id": "eval-qwen25-7b-gguf-q4",
+  "timestamp": "2026-11-02T10:11:00Z",
+  "submitter": {
+    "name": "Marcus Vance",
+    "github_handle": "marcus-vance",
+    "affiliation": "Open Weights Alliance"
+  },
+  "model": {
+    "model_id": "Qwen/Qwen2.5-7B-Instruct",
+    "model_slug": "Qwen2.5-7B-Instruct-GGUF_Q4_K_M",
+    "hf_url": "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct",
+    "param_count_b": 7.61,
+    "param_tier": "7B\u201314B",
+    "architecture": "Qwen2ForCausalLM",
+    "quantization": "GGUF Q4_K_M",
+    "context_length": 32768,
+    "license": "Apache-2.0",
+    "backend": "llama.cpp"
+  },
+  "hardware": {
+    "gpu_name": "NVIDIA GeForce RTX 3090",
+    "gpu_count": 1,
+    "gpu_vram_gb": 24.0,
+    "cpu": "AMD Ryzen 9 5900X",
+    "cpu_cores": 12,
+    "total_ram_gb": 32.0,
+    "os": "Windows 11 (10.0.26100)",
+    "cuda_version": "12.2",
+    "driver_version": "551.86"
+  },
+  "summary_scores": {
+    "overall_score": 82.1,
+    "gsm8k": 86.8,
+    "humaneval": 82.3,
+    "arc": 85.1,
+    "ifeval": 81.0,
+    "tool_calling": 72.8
+  },
+  "tasks": {
+    "gsm8k": {
+      "display_name": "GSM8K",
+      "score": 86.8,
+      "passed_samples": 1145,
+      "total_samples": 1319
+    },
+    "humaneval": {
+      "display_name": "HumanEval",
+      "score": 82.3,
+      "passed_samples": 135,
+      "total_samples": 164
+    },
+    "arc": {
+      "display_name": "ARC Challenge",
+      "score": 85.1,
+      "passed_samples": 997,
+      "total_samples": 1172
+    },
+    "ifeval": {
+      "display_name": "IFEval",
+      "score": 81.0,
+      "passed_samples": 438,
+      "total_samples": 541
+    },
+    "tool_calling": {
+      "display_name": "Tool Calling",
+      "score": 72.8,
+      "passed_samples": 218,
+      "total_samples": 300
+    }
+  },
+  "raw_logs_preview": "[2026-11-02 10:00:15] llama.cpp evaluation finished for Qwen2.5-7B GGUF Q4_K_M."
+}

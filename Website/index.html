@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Model Benchmark Leaderboard | Open Reproducible Evaluations</title>
+  <meta name="description" content="Open-source AI Model Benchmark Leaderboard hosted statically on GitHub Pages. Evaluated across GSM8K, HumanEval, ARC, IFEval, and Tool Calling.">
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfeff',
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+              900: '#164e63'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="min-h-screen flex flex-col bg-[#090d16] text-slate-100 antialiased selection:bg-cyan-500 selection:text-black">
+
+  <!-- Header / Navigation Bar -->
+  <header class="sticky top-0 z-40 glass-nav border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Brand Logo -->
+      <div class="flex items-center space-x-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-500 to-purple-500 p-0.5 shadow-lg shadow-cyan-500/20">
+          <div class="h-full w-full bg-[#090d16] rounded-[10px] flex items-center justify-center">
+            <i class="fa-solid fa-microchip text-cyan-400 text-lg"></i>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+              AI Model Benchmark Leaderboard
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800/50">
+                Static &bull; GitHub Pages
+              </span>
+            </h1>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Open &bull; Reproducible &bull; Community-Driven Evaluations (&le; 50B)</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <button id="nav-compare-btn" class="hidden sm:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/70 hover:bg-slate-700 border border-slate-700 transition">
+          <i class="fa-solid fa-code-compare text-indigo-400"></i>
+          <span>Compare (<span id="compare-count">0</span>)</span>
+        </button>
+
+        <button id="open-pr-guide-btn" class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-900 bg-gradient-to-r from-cyan-400 to-emerald-400 hover:from-cyan-300 hover:to-emerald-300 shadow-md shadow-cyan-500/20 transition transform hover:-translate-y-0.5">
+          <i class="fa-solid fa-code-pull-request text-slate-950"></i>
+          <span>Submit Model / PR Guide</span>
+        </button>
+
+        <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="p-2 rounded-lg text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 transition" title="View on GitHub">
+          <i class="fa-brands fa-github text-base"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+    
+    <!-- Hero / Intro -->
+    <div class="mb-8">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <div class="inline-flex items-center space-x-2 px-2.5 py-1 rounded-full bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 text-xs mb-3">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 live-indicator"></span>
+            <span>Live Data Loaded Statically from <code class="font-mono text-cyan-200">/data/results/*.json</code></span>
+          </div>
+          <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+            Next-Gen Open Weights Evaluations
+          </h2>
+          <p class="mt-2 text-slate-400 max-w-3xl text-sm sm:text-base leading-relaxed">
+            Standardized, automated benchmarks measuring real-world capabilities on <strong class="text-slate-200">GSM8K</strong> (Math), <strong class="text-slate-200">HumanEval</strong> (Coding), <strong class="text-slate-200">ARC</strong> (Reasoning), <strong class="text-slate-200">IFEval</strong> (Instruction), and <strong class="text-slate-200">Tool Calling</strong>. Built entirely static with zero database dependencies.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2 self-start md:self-auto text-xs text-slate-400 bg-slate-900/80 px-3 py-2 rounded-lg border border-slate-800">
+          <i class="fa-regular fa-clock text-cyan-400"></i>
+          <span>Last Aggregated: <strong id="last-updated-text" class="text-slate-200">Loading...</strong></span>
+        </div>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+        <div class="glass-panel rounded-xl p-4 relative overflow-hidden">
+          <div class="text-slate-400 text-xs font-medium flex items-center justify-between">
+            <span>Models Benchmarked</span>
+            <i class="fa-solid fa-server text-cyan-400/60 text-sm"></i>
+          </div>
+          <div id="stat-model-count" class="text-2xl sm:text-3xl font-extrabold text-cyan-400 mt-2">--</div>
+          <div class="text-[11px] text-slate-500 mt-1">&le; 50B parameter limit</div>
+        </div>
+
+        <div class="glass-panel rounded-xl p-4 relative overflow-hidden">
+          <div class="text-slate-400 text-xs font-medium flex items-center justify-between">
+            <span>Leader / Top Score</span>
+            <i class="fa-solid fa-trophy text-amber-400/70 text-sm"></i>
+          </div>
+          <div id="stat-top-score" class="text-2xl sm:text-3xl font-extrabold text-emerald-400 mt-2">--</div>
+          <div id="stat-top-model" class="text-[11px] text-slate-400 mt-1 truncate">Loading...</div>
+        </div>
+
+        <div class="glass-panel rounded-xl p-4 relative overflow-hidden">
+          <div class="text-slate-400 text-xs font-medium flex items-center justify-between">
+            <span>Top Coding (HumanEval)</span>
+            <i class="fa-solid fa-code text-indigo-400/70 text-sm"></i>
+          </div>
+          <div id="stat-top-coding" class="text-2xl sm:text-3xl font-extrabold text-indigo-400 mt-2">--</div>
+          <div id="stat-top-coding-model" class="text-[11px] text-slate-400 mt-1 truncate">pass@1 benchmark</div>
+        </div>
+
+        <div class="glass-panel rounded-xl p-4 relative overflow-hidden">
+          <div class="text-slate-400 text-xs font-medium flex items-center justify-between">
+            <span>Top Math (GSM8K)</span>
+            <i class="fa-solid fa-square-root-variable text-purple-400/70 text-sm"></i>
+          </div>
+          <div id="stat-top-math" class="text-2xl sm:text-3xl font-extrabold text-purple-400 mt-2">--</div>
+          <div id="stat-top-math-model" class="text-[11px] text-slate-400 mt-1 truncate">Strict accuracy</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters & Search Toolbar -->
+    <div class="glass-panel rounded-xl p-4 mb-6 shadow-lg">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-slate-800">
+        
+        <!-- Search Input -->
+        <div class="relative flex-grow max-w-lg">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-sm"></i>
+          <input type="text" id="search-input" placeholder="Search by model name, architecture, license, backend, quant..." 
+            class="w-full bg-[#050811] border border-slate-700/80 rounded-lg pl-9 pr-9 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition">
+          <button id="clear-search-btn" class="hidden absolute right-3 top-2.5 text-slate-500 hover:text-slate-300">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <!-- Action / Export controls -->
+        <div class="flex items-center flex-wrap gap-2 text-xs">
+          <button id="export-csv-btn" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+            <i class="fa-solid fa-file-csv text-emerald-400"></i>
+            <span>Export CSV</span>
+          </button>
+          <button id="export-json-btn" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+            <i class="fa-solid fa-file-code text-cyan-400"></i>
+            <span>Export JSON</span>
+          </button>
+          <button id="reset-filters-btn" class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60 transition">
+            <i class="fa-solid fa-rotate-left"></i>
+            <span>Reset</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Dropdowns Row -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
+        <!-- Parameter Tier Filter -->
+        <div>
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            <i class="fa-solid fa-sliders text-cyan-400 mr-1"></i> Parameter Tier
+          </label>
+          <select id="tier-filter" class="w-full bg-[#050811] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+            <option value="all">All Tiers (&le; 50B)</option>
+            <option value="< 3B">&lt; 3B Parameters</option>
+            <option value="3B–7B">3B – 7B Parameters</option>
+            <option value="7B–14B">7B – 14B Parameters</option>
+            <option value="14B–32B">14B – 32B Parameters</option>
+            <option value="32B–50B">32B – 50B Parameters</option>
+          </select>
+        </div>
+
+        <!-- License Filter -->
+        <div>
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            <i class="fa-solid fa-scale-balanced text-indigo-400 mr-1"></i> Model License
+          </label>
+          <select id="license-filter" class="w-full bg-[#050811] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+            <option value="all">All Licenses</option>
+            <!-- Injected dynamically by JS -->
+          </select>
+        </div>
+
+        <!-- Quantization Filter -->
+        <div>
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            <i class="fa-solid fa-box-archive text-purple-400 mr-1"></i> Quantization
+          </label>
+          <select id="quant-filter" class="w-full bg-[#050811] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+            <option value="all">All Quantizations</option>
+            <option value="BF16">BF16 / FP16 (Full Precision)</option>
+            <option value="GGUF">GGUF (Q4 / Q8)</option>
+            <option value="AWQ">AWQ (4-bit)</option>
+            <option value="NF4">BitsAndBytes NF4</option>
+          </select>
+        </div>
+
+        <!-- Sort By -->
+        <div>
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            <i class="fa-solid fa-arrow-down-short-wide text-emerald-400 mr-1"></i> Sort By
+          </label>
+          <select id="sort-select" class="w-full bg-[#050811] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+            <option value="overall_desc">Overall Score (Highest)</option>
+            <option value="gsm8k_desc">GSM8K Math (Highest)</option>
+            <option value="humaneval_desc">HumanEval Coding (Highest)</option>
+            <option value="arc_desc">ARC Reasoning (Highest)</option>
+            <option value="ifeval_desc">IFEval (Highest)</option>
+            <option value="tool_calling_desc">Tool Calling (Highest)</option>
+            <option value="params_asc">Parameters (Smallest First)</option>
+            <option value="params_desc">Parameters (Largest First)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Active Filter Status Bar -->
+      <div class="mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400">
+        <span id="results-count-text">Showing 0 models</span>
+        <span class="text-slate-500 text-[11px] hidden sm:inline">Tip: Click on any column header to sort &bull; Click any row to inspect full telemetry</span>
+      </div>
+    </div>
+
+    <!-- Leaderboard Table Container -->
+    <div class="glass-panel rounded-xl overflow-hidden shadow-2xl mb-8 border border-slate-800">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm" id="leaderboard-table">
+          <thead class="bg-[#050811] text-[11px] uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-800">
+            <tr>
+              <th class="px-3 py-3.5 w-10 text-center">
+                <span class="sr-only">Compare</span>
+                <i class="fa-solid fa-check-double text-slate-500" title="Select for comparison"></i>
+              </th>
+              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition w-16" data-sort="rank">
+                <div class="flex items-center space-x-1">
+                  <span>Rank</span>
+                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-rank"></i>
+                </div>
+              </th>
+              <th class="px-4 py-3.5 cursor-pointer hover:text-white transition min-w-[220px]" data-sort="name">
+                <div class="flex items-center space-x-1">
+                  <span>Model Name</span>
+                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-name"></i>
+                </div>
+              </th>
+              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition" data-sort="params">
+                <div class="flex items-center space-x-1">
+                  <span>Params</span>
+                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-params"></i>
+                </div>
+              </th>
+              <th class="px-4 py-3.5 cursor-pointer hover:text-white transition text-right bg-cyan-950/20 border-x border-slate-800/50" data-sort="overall">
+                <div class="flex items-center justify-end space-x-1 text-cyan-300 font-bold">
+                  <span>Overall</span>
+                  <i class="fa-solid fa-sort-down text-cyan-400 text-xs" id="sort-icon-overall"></i>
+                </div>
+              </th>
+              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition text-right" data-sort="gsm8k">
+                <div class="flex items-center justify-end space-x-1" title="Grade School Math 8K">
+                  <span>GSM8K</span>
+                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-gsm8k"></i>
+                </div>
+              </th>
+              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition text-right" data-sort="humaneval">
+                <div class="flex items-center justify-end space-x-1" title="HumanEval Python pass@1">
+                  <span>HumanEval</span>
+                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-humaneval"></i>
+                </div>
+              </th>
+              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition text-right" data-sort="arc">
+                <div class="flex items-center justify-end space-x-1" title="AI2 Reasoning Challenge">
+                  <span>ARC</span>
+                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-arc"></i>
+                </div>
+              </th>
+              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition text-right" data-sort="ifeval">
+                <div class="flex items-center justify-end space-x-1" title="Instruction Following Evaluation">
+                  <span>IFEval</span>
+                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-ifeval"></i>
+                </div>
+              </th>
+              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition text-right" data-sort="tool_calling">
+                <div class="flex items-center justify-end space-x-1" title="Multi-Turn Tool Calling Accuracy">
+                  <span>Tool Calling</span>
+                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-tool_calling"></i>
+                </div>
+              </th>
+              <th class="px-3 py-3.5 text-center w-20">Inspect</th>
+            </tr>
+          </thead>
+          <tbody id="table-body" class="divide-y divide-slate-800/80 text-slate-200">
+            <!-- Dynamic rows rendered by app.js -->
+            <tr>
+              <td colspan="11" class="text-center py-12 text-slate-500">
+                <i class="fa-solid fa-spinner fa-spin text-2xl text-cyan-400 mb-2"></i>
+                <div>Loading benchmark data from static JSON...</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Visualizations: Radar & Parameter Efficiency Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+      <!-- 5-Pillar Capability Radar Chart -->
+      <div class="glass-panel rounded-xl p-5 shadow-lg">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+            <i class="fa-solid fa-chart-radar text-cyan-400"></i>
+            <span>5-Pillar Capability Radar</span>
+          </h3>
+          <span class="text-[11px] text-slate-400">Comparing top 3 models</span>
+        </div>
+        <p class="text-xs text-slate-400 mb-4">Normalized benchmark performance across GSM8K, HumanEval, ARC, IFEval, and Tool Calling.</p>
+        <div class="h-72 flex items-center justify-center">
+          <canvas id="radarChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Parameter Size vs Overall Score Chart -->
+      <div class="glass-panel rounded-xl p-5 shadow-lg">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+            <i class="fa-solid fa-chart-column text-indigo-400"></i>
+            <span>Parameter Efficiency & Score Distribution</span>
+          </h3>
+          <span class="text-[11px] text-slate-400">Score vs Model Size</span>
+        </div>
+        <p class="text-xs text-slate-400 mb-4">Overall Score comparison highlighting parameter-efficient compact models.</p>
+        <div class="h-72 flex items-center justify-center">
+          <canvas id="barChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Community Pull Request Guide Section / Banner -->
+    <div class="glass-panel rounded-2xl p-6 sm:p-8 border border-cyan-800/40 relative overflow-hidden mb-12 glow-cyan">
+      <div class="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
+        <i class="fa-solid fa-code-pull-request text-[240px] text-cyan-400"></i>
+      </div>
+      <div class="relative z-10 max-w-3xl">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800/80 mb-3">
+          <i class="fa-solid fa-users text-cyan-400 mr-1.5"></i> Community Contributions Welcome
+        </span>
+        <h3 class="text-2xl font-extrabold text-white">Have a model you'd like to benchmark?</h3>
+        <p class="text-sm text-slate-300 mt-2 leading-relaxed">
+          Anyone can submit benchmark results directly via GitHub Pull Requests! Run our reproducible test harness, drop the resulting JSON file into <code class="bg-[#050811] px-1.5 py-0.5 rounded text-cyan-300 font-mono text-xs">/data/results/&lt;model_slug&gt;.json</code>, and open a PR. Our automated CI verifies telemetry and updates the static leaderboard upon merge.
+        </p>
+        <div class="mt-5 flex flex-wrap gap-3">
+          <button id="cta-pr-guide-btn" class="px-4 py-2 rounded-lg text-xs sm:text-sm font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-emerald-400 hover:from-cyan-300 hover:to-emerald-300 transition shadow-lg shadow-cyan-500/20">
+            <i class="fa-solid fa-book-open mr-1.5"></i> Read Step-by-Step Submission Guide
+          </button>
+          <button id="cta-test-validator-btn" class="px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition">
+            <i class="fa-solid fa-vial-circle-check text-cyan-400 mr-1.5"></i> Test Your JSON Schema Locally
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Floating Comparison Dock (Appears when >= 2 models selected) -->
+  <div id="compare-dock" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40 hidden">
+    <div class="glass-panel px-5 py-3 rounded-2xl shadow-2xl border border-indigo-500/50 flex items-center space-x-4 glow-indigo">
+      <div class="flex items-center space-x-2 text-xs">
+        <span class="h-2 w-2 rounded-full bg-indigo-400 live-indicator"></span>
+        <span class="font-semibold text-white"><span id="dock-count">0</span> models selected</span>
+      </div>
+      <button id="dock-compare-btn" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition shadow-md">
+        Compare Head-to-Head
+      </button>
+      <button id="dock-clear-btn" class="text-slate-400 hover:text-white text-xs">
+        Clear
+      </button>
+    </div>
+  </div>
+
+  <!-- Modal: Model Inspector / Full Telemetry Card -->
+  <div id="model-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+    <div class="glass-panel rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl relative border border-slate-700">
+      
+      <!-- Modal Header -->
+      <div class="p-6 border-b border-slate-800 flex items-start justify-between">
+        <div>
+          <div class="flex items-center space-x-2 mb-1">
+            <span id="modal-rank-badge" class="px-2 py-0.5 rounded text-xs font-bold bg-cyan-900/60 text-cyan-300 border border-cyan-700/60">Rank #1</span>
+            <span id="modal-tier-badge" class="px-2 py-0.5 rounded text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">7B–14B</span>
+            <span id="modal-quant-badge" class="px-2 py-0.5 rounded text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">GGUF Q4_K_M</span>
+          </div>
+          <h3 id="modal-model-title" class="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
+            Model Name
+          </h3>
+          <div class="flex items-center space-x-3 mt-1 text-xs">
+            <a id="modal-hf-link" href="#" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:underline flex items-center space-x-1">
+              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              <span>View on Hugging Face</span>
+            </a>
+            <span class="text-slate-600">&bull;</span>
+            <span id="modal-eval-id" class="text-slate-400 font-mono">eval-id</span>
+          </div>
+        </div>
+
+        <button id="modal-close-btn" class="text-slate-400 hover:text-white text-xl p-1 rounded-lg hover:bg-slate-800 transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Tabs Navigation -->
+      <div class="flex border-b border-slate-800 px-6 text-xs font-semibold bg-[#050811]/60">
+        <button class="modal-tab-btn py-3 px-3 border-b-2 border-cyan-400 text-cyan-300" data-tab="tab-overview">
+          <i class="fa-solid fa-chart-pie mr-1.5"></i> Scores & Tasks
+        </button>
+        <button class="modal-tab-btn py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200" data-tab="tab-hardware">
+          <i class="fa-solid fa-microchip mr-1.5"></i> Hardware & Run Info
+        </button>
+        <button class="modal-tab-btn py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200" data-tab="tab-logs">
+          <i class="fa-solid fa-terminal mr-1.5"></i> Raw Execution Logs
+        </button>
+        <button class="modal-tab-btn py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200" data-tab="tab-json">
+          <i class="fa-solid fa-code mr-1.5"></i> Raw JSON Result
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="p-6 overflow-y-auto space-y-6 flex-grow" id="modal-body">
+        
+        <!-- Tab 1: Scores & Tasks -->
+        <div id="tab-overview" class="modal-tab-content space-y-5">
+          <!-- Overall Summary Cards -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-[#050811] p-3 rounded-xl border border-slate-800">
+              <span class="text-slate-400 text-xs">Overall Score</span>
+              <div id="modal-score-overall" class="text-2xl font-extrabold text-cyan-400 mt-1">--</div>
+            </div>
+            <div class="bg-[#050811] p-3 rounded-xl border border-slate-800">
+              <span class="text-slate-400 text-xs">Parameters</span>
+              <div id="modal-param-count" class="text-2xl font-extrabold text-white mt-1">--</div>
+            </div>
+            <div class="bg-[#050811] p-3 rounded-xl border border-slate-800">
+              <span class="text-slate-400 text-xs">Architecture</span>
+              <div id="modal-architecture" class="text-base font-bold text-slate-200 mt-2 truncate">--</div>
+            </div>
+            <div class="bg-[#050811] p-3 rounded-xl border border-slate-800">
+              <span class="text-slate-400 text-xs">License</span>
+              <div id="modal-license" class="text-base font-bold text-slate-200 mt-2 truncate">--</div>
+            </div>
+          </div>
+
+          <!-- Benchmark Breakdown Progress Bars -->
+          <div>
+            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">Benchmark Performance Breakdown</h4>
+            <div class="space-y-3" id="modal-tasks-breakdown">
+              <!-- Injected by JavaScript -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Hardware & Run Info -->
+        <div id="tab-hardware" class="modal-tab-content hidden space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 space-y-2">
+              <h5 class="font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center">
+                <i class="fa-solid fa-memory text-cyan-400 mr-2"></i> GPU & Acceleration
+              </h5>
+              <div><span class="text-slate-400">GPU Model:</span> <strong id="modal-hw-gpu" class="text-white">N/A</strong></div>
+              <div><span class="text-slate-400">GPU VRAM:</span> <strong id="modal-hw-vram" class="text-white">N/A</strong></div>
+              <div><span class="text-slate-400">CUDA / Driver:</span> <strong id="modal-hw-cuda" class="text-white">N/A</strong></div>
+              <div><span class="text-slate-400">Inference Backend:</span> <strong id="modal-hw-backend" class="text-white">N/A</strong></div>
+            </div>
+
+            <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 space-y-2">
+              <h5 class="font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center">
+                <i class="fa-solid fa-server text-indigo-400 mr-2"></i> Host Environment
+              </h5>
+              <div><span class="text-slate-400">CPU:</span> <strong id="modal-hw-cpu" class="text-white">N/A</strong></div>
+              <div><span class="text-slate-400">CPU Cores:</span> <strong id="modal-hw-cores" class="text-white">N/A</strong></div>
+              <div><span class="text-slate-400">Host RAM:</span> <strong id="modal-hw-ram" class="text-white">N/A</strong></div>
+              <div><span class="text-slate-400">Operating System:</span> <strong id="modal-hw-os" class="text-white">N/A</strong></div>
+            </div>
+          </div>
+
+          <!-- Submitter Attribution -->
+          <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 text-xs">
+            <h5 class="font-bold text-slate-300 uppercase tracking-wider mb-2">Submission Details</h5>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div><span class="text-slate-400">Submitter:</span> <strong id="modal-sub-name" class="text-white block">Community</strong></div>
+              <div><span class="text-slate-400">GitHub:</span> <strong id="modal-sub-github" class="text-cyan-400 block font-mono">@user</strong></div>
+              <div><span class="text-slate-400">Evaluated On:</span> <strong id="modal-sub-timestamp" class="text-white block font-mono">--</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Raw Logs -->
+        <div id="tab-logs" class="modal-tab-content hidden">
+          <div class="terminal-window">
+            <div class="terminal-header">
+              <span class="text-xs font-mono text-slate-400 flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
+                <span class="ml-2">evaluation.log</span>
+              </span>
+              <button id="copy-logs-btn" class="text-xs text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 transition">
+                <i class="fa-regular fa-copy mr-1"></i> Copy Logs
+              </button>
+            </div>
+            <pre id="modal-raw-logs" class="p-4 text-xs font-mono text-emerald-400/90 whitespace-pre-wrap max-h-80 overflow-y-auto leading-relaxed bg-[#03060c]">Loading logs...</pre>
+          </div>
+        </div>
+
+        <!-- Tab 4: Raw JSON Result -->
+        <div id="tab-json" class="modal-tab-content hidden">
+          <div class="terminal-window">
+            <div class="terminal-header">
+              <span class="text-xs font-mono text-slate-400 flex items-center space-x-2">
+                <i class="fa-solid fa-file-code text-cyan-400"></i>
+                <span id="modal-json-filename">result.json</span>
+              </span>
+              <div class="flex items-center space-x-2">
+                <button id="copy-json-btn" class="text-xs text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 transition">
+                  <i class="fa-regular fa-copy mr-1"></i> Copy JSON
+                </button>
+                <a id="download-json-btn" href="#" download class="text-xs text-cyan-400 hover:text-cyan-300 px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 transition">
+                  <i class="fa-solid fa-download mr-1"></i> Download
+                </a>
+              </div>
+            </div>
+            <pre id="modal-raw-json" class="p-4 text-xs font-mono text-cyan-200/90 whitespace-pre max-h-80 overflow-y-auto leading-relaxed bg-[#03060c]">Loading JSON...</pre>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-slate-800 bg-[#050811] flex justify-end">
+        <button id="modal-footer-close" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 transition">
+          Close
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal: Compare Head-to-Head -->
+  <div id="compare-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+    <div class="glass-panel rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl relative border border-slate-700">
+      <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <h3 class="text-xl font-bold text-white flex items-center space-x-2">
+            <i class="fa-solid fa-code-compare text-indigo-400"></i>
+            <span>Head-to-Head Comparison</span>
+          </h3>
+          <p class="text-xs text-slate-400 mt-1">Comparing side-by-side performance metrics & specs</p>
+        </div>
+        <button id="compare-modal-close" class="text-slate-400 hover:text-white text-xl">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-6 overflow-x-auto overflow-y-auto" id="compare-content">
+        <!-- Injected by JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Pull Request Submission Guide & Local Validator -->
+  <div id="pr-guide-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+    <div class="glass-panel rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl relative border border-cyan-800/60">
+      
+      <!-- PR Guide Header -->
+      <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <span class="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Community Contribution Workflow</span>
+          <h3 class="text-2xl font-extrabold text-white flex items-center gap-2 mt-0.5">
+            <i class="fa-solid fa-code-pull-request text-cyan-400"></i>
+            <span>Submit a Model to the Leaderboard</span>
+          </h3>
+        </div>
+        <button id="pr-guide-close-btn" class="text-slate-400 hover:text-white text-xl">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Tabs inside PR Guide -->
+      <div class="flex border-b border-slate-800 px-6 text-xs font-semibold bg-[#050811]/60">
+        <button class="pr-tab-btn py-3 px-3 border-b-2 border-cyan-400 text-cyan-300" data-prtab="pr-tab-steps">
+          <i class="fa-solid fa-list-ol mr-1.5"></i> 4-Step Submission Guide
+        </button>
+        <button class="pr-tab-btn py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200" data-prtab="pr-tab-validator">
+          <i class="fa-solid fa-vial-circle-check mr-1.5"></i> Local JSON Validator
+        </button>
+        <button class="pr-tab-btn py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200" data-prtab="pr-tab-template">
+          <i class="fa-solid fa-file-lines mr-1.5"></i> PR Template
+        </button>
+      </div>
+
+      <!-- PR Guide Content -->
+      <div class="p-6 overflow-y-auto space-y-6 flex-grow text-xs leading-relaxed">
+        
+        <!-- Tab: 4-Step Workflow -->
+        <div id="pr-tab-steps" class="pr-tab-content space-y-6">
+          
+          <!-- Step 1 -->
+          <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold text-sm">
+              <span class="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-700 flex items-center justify-center text-xs">1</span>
+              <span>Fork & Clone the Repository</span>
+            </div>
+            <p class="text-slate-400 pl-8">Fork the leaderboard repository to your personal GitHub account and clone it to your evaluation machine:</p>
+            <div class="pl-8">
+              <pre class="bg-black/60 p-3 rounded-lg border border-slate-800 font-mono text-cyan-300 text-xs flex justify-between items-center">
+<span>git clone https://github.com/&lt;your-username&gt;/llm-auto-benchmark-leaderboard.git
+cd llm-auto-benchmark-leaderboard</span>
+                <button onclick="navigator.clipboard.writeText('git clone https://github.com/<your-username>/llm-auto-benchmark-leaderboard.git\ncd llm-auto-benchmark-leaderboard')" class="text-slate-500 hover:text-white ml-2"><i class="fa-regular fa-copy"></i></button>
+              </pre>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold text-sm">
+              <span class="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-700 flex items-center justify-center text-xs">2</span>
+              <span>Run the Evaluation Suite Locally</span>
+            </div>
+            <p class="text-slate-400 pl-8">Run the automated benchmark harness with your model ID or local weights path:</p>
+            <div class="pl-8">
+              <pre class="bg-black/60 p-3 rounded-lg border border-slate-800 font-mono text-cyan-300 text-xs flex justify-between items-center">
+<span># Example running evaluation for an open-weight model:
+python -m slm_bench.evaluate \
+  --model-id "Qwen/Qwen2.5-7B-Instruct" \
+  --quantization "GGUF_Q4_K_M" \
+  --backend llama.cpp \
+  --benchmarks gsm8k,humaneval,arc,ifeval,tool_calling \
+  --output-dir ./data/results/</span>
+                <button onclick="navigator.clipboard.writeText('python -m slm_bench.evaluate --model-id \"Qwen/Qwen2.5-7B-Instruct\" --quantization \"GGUF_Q4_K_M\" --backend llama.cpp --benchmarks gsm8k,humaneval,arc,ifeval,tool_calling --output-dir ./data/results/')" class="text-slate-500 hover:text-white ml-2"><i class="fa-regular fa-copy"></i></button>
+              </pre>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold text-sm">
+              <span class="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-700 flex items-center justify-center text-xs">3</span>
+              <span>Drop the Generated JSON into <code class="text-cyan-300 font-mono">/data/results/</code></span>
+            </div>
+            <p class="text-slate-400 pl-8">The harness automatically generates a standard JSON file named <code class="text-slate-200 font-mono">&lt;organization&gt;_&lt;model_slug&gt;.json</code> in <code class="text-slate-200 font-mono">data/results/</code>. Verify it contains hardware telemetry and sample run logs.</p>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold text-sm">
+              <span class="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-700 flex items-center justify-center text-xs">4</span>
+              <span>Commit, Push & Open Pull Request</span>
+            </div>
+            <p class="text-slate-400 pl-8">Create a feature branch, commit your result file, push to your fork, and submit a PR:</p>
+            <div class="pl-8">
+              <pre class="bg-black/60 p-3 rounded-lg border border-slate-800 font-mono text-cyan-300 text-xs flex justify-between items-center">
+<span>git checkout -b submit/qwen-2.5-7b
+git add data/results/Qwen_Qwen2.5-7B-Instruct-GGUF_Q4_K_M.json
+git commit -m "feat(benchmark): add Qwen2.5-7B-Instruct evaluation"
+git push origin submit/qwen-2.5-7b</span>
+                <button onclick="navigator.clipboard.writeText('git checkout -b submit/qwen-2.5-7b\ngit add data/results/Qwen_Qwen2.5-7B-Instruct-GGUF_Q4_K_M.json\ngit commit -m \"feat(benchmark): add Qwen2.5-7B-Instruct evaluation\"\ngit push origin submit/qwen-2.5-7b')" class="text-slate-500 hover:text-white ml-2"><i class="fa-regular fa-copy"></i></button>
+              </pre>
+              <p class="mt-2 text-slate-400">Our GitHub Actions CI will automatically validate your submission against schema rules, verify parameter limits (&le; 50B), and re-aggregate the leaderboard on merge!</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Tab: In-Browser Validator -->
+        <div id="pr-tab-validator" class="pr-tab-content hidden space-y-4">
+          <p class="text-slate-300">Paste your generated benchmark JSON below to test compliance before submitting your pull request:</p>
+          <div class="relative">
+            <textarea id="validator-input" rows="8" placeholder='{"model": {"model_id": "...", "param_count_b": 7.0}, "summary_scores": {...}}' class="w-full bg-[#050811] border border-slate-700 rounded-lg p-3 font-mono text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500"></textarea>
+          </div>
+          <div class="flex items-center space-x-3">
+            <button id="validate-btn" class="px-4 py-2 rounded-lg text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 transition">
+              <i class="fa-solid fa-check-double mr-1.5"></i> Validate Submission JSON
+            </button>
+            <button id="load-sample-btn" class="px-3 py-2 rounded-lg text-xs text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition">
+              Load Sample Template
+            </button>
+          </div>
+          <div id="validator-feedback" class="hidden p-3 rounded-lg text-xs"></div>
+        </div>
+
+        <!-- Tab: PR Template -->
+        <div id="pr-tab-template" class="pr-tab-content hidden space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-400">Copy this markdown template into your GitHub Pull Request description:</span>
+            <button id="copy-pr-template-btn" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-cyan-300 border border-slate-700 transition">
+              <i class="fa-regular fa-copy mr-1"></i> Copy Template
+            </button>
+          </div>
+          <pre id="pr-template-preview" class="bg-[#050811] p-4 rounded-xl border border-slate-800 font-mono text-slate-300 text-xs whitespace-pre-wrap max-h-80 overflow-y-auto leading-relaxed">Loading template...</pre>
+        </div>
+
+      </div>
+
+      <div class="p-4 border-t border-slate-800 bg-[#050811] flex justify-end">
+        <button id="pr-guide-close-bottom" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 transition">
+          Close
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800/80 bg-[#050811]/70 py-8 text-xs text-slate-500 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-microchip text-cyan-400"></i>
+        <span>AI Model Benchmark Leaderboard &bull; 100% Client-Side Static Architecture</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <a href="https://huggingface.co" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition flex items-center space-x-1">
+          <span>Hugging Face Hub</span>
+        </a>
+        <a href="PR_TEMPLATE.md" target="_blank" class="hover:text-slate-300 transition">PR Template</a>
+        <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition flex items-center space-x-1">
+          <i class="fa-brands fa-github"></i>
+          <span>GitHub</span>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Main JavaScript App -->
+  <script src="app.js"></script>
+</body>
+</html>

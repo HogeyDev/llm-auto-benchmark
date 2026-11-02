@@ -1,0 +1,73 @@
+{
+  "evaluation_id": "eval-phi35-mini-awq",
+  "timestamp": "2026-10-18T13:45:00Z",
+  "submitter": {
+    "name": "Karthik Subramanian",
+    "github_handle": "ksubramanian-dev",
+    "affiliation": "Edge LLM Benchmarks"
+  },
+  "model": {
+    "model_id": "microsoft/Phi-3.5-mini-instruct",
+    "model_slug": "Phi-3.5-mini-instruct-AWQ_4BIT",
+    "hf_url": "https://huggingface.co/microsoft/Phi-3.5-mini-instruct",
+    "param_count_b": 3.82,
+    "param_tier": "3B\u20137B",
+    "architecture": "Phi3ForCausalLM",
+    "quantization": "AWQ",
+    "context_length": 131072,
+    "license": "MIT",
+    "backend": "AutoAWQ"
+  },
+  "hardware": {
+    "gpu_name": "NVIDIA GeForce RTX 4060",
+    "gpu_count": 1,
+    "gpu_vram_gb": 8.0,
+    "cpu": "AMD Ryzen 7 7700",
+    "cpu_cores": 8,
+    "total_ram_gb": 32.0,
+    "os": "Windows 11 (10.0.22631)",
+    "cuda_version": "12.3",
+    "driver_version": "546.33"
+  },
+  "summary_scores": {
+    "overall_score": 76.7,
+    "gsm8k": 82.1,
+    "humaneval": 68.9,
+    "arc": 82.4,
+    "ifeval": 77.1,
+    "tool_calling": 70.8
+  },
+  "tasks": {
+    "gsm8k": {
+      "display_name": "GSM8K",
+      "score": 82.1,
+      "passed_samples": 1083,
+      "total_samples": 1319
+    },
+    "humaneval": {
+      "display_name": "HumanEval",
+      "score": 68.9,
+      "passed_samples": 113,
+      "total_samples": 164
+    },
+    "arc": {
+      "display_name": "ARC Challenge",
+      "score": 82.4,
+      "passed_samples": 966,
+      "total_samples": 1172
+    },
+    "ifeval": {
+      "display_name": "IFEval",
+      "score": 77.1,
+      "passed_samples": 417,
+      "total_samples": 541
+    },
+    "tool_calling": {
+      "display_name": "Tool Calling",
+      "score": 70.8,
+      "passed_samples": 212,
+      "total_samples": 300
+    }
+  },
+  "raw_logs_preview": "[2026-10-18 13:30:00] AutoAWQ quantization verified. High efficiency in memory constrained setups."
+}
