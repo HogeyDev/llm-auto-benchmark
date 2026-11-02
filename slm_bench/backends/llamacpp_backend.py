@@ -98,6 +98,13 @@ class LlamaCppBackend(BaseInferenceBackend):
 
         return GenerationResult(text.strip(), dt_ms, tokens_gen)
 
+    def get_model_ram_gb(self) -> Optional[float]:
+        """Calculate model RAM footprint based on mapped GGUF file size."""
+        from pathlib import Path
+        if self.model_path and Path(self.model_path).is_file():
+            return round(Path(self.model_path).stat().st_size / (1024 ** 3), 2)
+        return None
+
     def unload(self) -> None:
         if self.llm is not None:
             del self.llm

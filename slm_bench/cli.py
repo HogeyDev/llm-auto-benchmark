@@ -13,6 +13,7 @@ from rich.panel import Panel
 
 from .models.hardware import get_hardware_info
 from .models.metadata import fetch_hf_model_metadata
+from .models.memory_detector import auto_detect_model_ram_gb
 from .models.schema import BenchmarkResult
 from .backends.registry import get_backend
 from .benchmarks.suite import BenchmarkSuite
@@ -114,10 +115,24 @@ def evaluate(
         logger.error(f"Failed to initialize backend '{backend}': {e}")
         raise typer.Exit(code=1)
 
-    # 4. Parse Selected Tasks
+    # 4. Auto-detect Model RAM / VRAM if not explicitly specified
+    if model_ram_gb is None:
+        detected_ram = auto_detect_model_ram_gb(
+            backend_instance=engine,
+            backend_name=backend,
+            model_id=model_id,
+            quantization=quantization,
+            param_count_b=meta.param_count_b,
+            endpoint_url=endpoint_url if backend in ("openai", "ollama", "lmstudio", "endpoint", "localai") else None,
+        )
+        if detected_ram:
+            meta.model_ram_gb = detected_ram
+            hw.model_ram_gb = detected_ram
+
+    # 5. Parse Selected Tasks
     task_list = [t.strip() for t in tasks.split(",")] if tasks else None
 
-    # 5. Run Benchmark Suite
+    # 6. Run Benchmark Suite
     suite = BenchmarkSuite()
     result = suite.run_suite(
         backend=engine,

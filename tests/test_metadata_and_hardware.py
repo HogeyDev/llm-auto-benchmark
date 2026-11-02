@@ -67,3 +67,19 @@ def test_estimate_model_ram_gb():
     assert estimate_model_ram_gb(8.0, "GGUF_Q8_0") == 9.20
     assert estimate_model_ram_gb(3.0, "BF16") == 6.45
     assert estimate_model_ram_gb(None, "BF16") is None
+
+
+def test_auto_detect_model_ram_gb(tmp_path):
+    from slm_bench.models.memory_detector import auto_detect_model_ram_gb, detect_local_file_ram_gb
+
+    # Test file-based detection on dummy GGUF file
+    dummy_gguf = tmp_path / "model.gguf"
+    # Write 10 MB file
+    dummy_gguf.write_bytes(b"\x00" * (10 * 1024 * 1024))
+    file_ram = detect_local_file_ram_gb(str(dummy_gguf))
+    assert file_ram is not None
+    assert round(file_ram, 2) == 0.01
+
+    # Test fallback analytical detection
+    ram = auto_detect_model_ram_gb(param_count_b=7.0, quantization="GGUF_Q4_K_M")
+    assert ram == 4.55

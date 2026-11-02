@@ -1,7 +1,7 @@
 {
   "metadata": {
     "total_models": 11,
-    "last_updated": "2026-11-02T17:51:36.268740+00:00",
+    "last_updated": "2026-11-02T17:58:53.873913+00:00",
     "highest_overall": 87.65,
     "best_by_benchmark": {
       "gsm8k": 94.2,

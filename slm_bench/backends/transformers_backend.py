@@ -123,6 +123,22 @@ class TransformersBackend(BaseInferenceBackend):
 
         return self.generate(prompt, max_new_tokens, temperature, stop_sequences)
 
+    def get_model_ram_gb(self) -> Optional[float]:
+        """Measure loaded model tensor memory footprint."""
+        if self.model is not None and hasattr(self.model, "get_memory_footprint"):
+            try:
+                footprint = self.model.get_memory_footprint()
+                return round(footprint / (1024 ** 3), 2)
+            except Exception:
+                pass
+        try:
+            import torch
+            if torch.cuda.is_available() and torch.cuda.memory_allocated() > 0:
+                return round(torch.cuda.memory_allocated() / (1024 ** 3), 2)
+        except Exception:
+            pass
+        return None
+
     def unload(self) -> None:
         import gc
         import torch

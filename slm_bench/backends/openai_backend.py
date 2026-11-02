@@ -163,6 +163,16 @@ class OpenAICompatibleBackend(BaseInferenceBackend):
             tokens_generated=completion_tokens,
         )
 
+    def get_model_ram_gb(self) -> Optional[float]:
+        """Automatically retrieve model RAM/VRAM footprint from Ollama or local server."""
+        if self.model_ram_gb:
+            return self.model_ram_gb
+        from ..models.memory_detector import detect_ollama_model_ram_gb, detect_runner_process_ram_gb
+        ram = detect_ollama_model_ram_gb(self.endpoint_url, self.model_id)
+        if ram:
+            return ram
+        return detect_runner_process_ram_gb()
+
     def unload(self) -> None:
         """Release backend resources."""
         self.is_loaded = False

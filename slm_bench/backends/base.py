@@ -80,6 +80,10 @@ class BaseInferenceBackend(ABC):
         gen = self.chat(augmented_messages, max_new_tokens=max_new_tokens, temperature=0.0)
         return {"raw_output": gen.text, "latency_ms": gen.latency_ms}
 
+    def get_model_ram_gb(self) -> Optional[float]:
+        """Return measured RAM or VRAM footprint in GB if available from runtime."""
+        return getattr(self, "model_ram_gb", None)
+
     def unload(self) -> None:
         """Release resources."""
         self.is_loaded = False
