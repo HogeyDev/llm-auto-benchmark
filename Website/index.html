@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Local AI Benchmark — open models on ordinary hardware</title>
-  <meta name="description" content="A leaderboard for open-weights models tested on consumer GPUs, Apple Silicon, and plain system RAM. Every score comes with the hardware it ran on.">
+  <title>Local AI Benchmark</title>
+  <meta name="description" content="Empirical performance benchmarks for open-weights models running on consumer hardware.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
 </head>
 <body>
-  <a class="sr-only" href="#ledger">Skip to the leaderboard</a>
+  <a class="sr-only" href="#ledger">Skip to leaderboard</a>
 
   <header class="masthead">
     <div class="wrap masthead-inner">
@@ -18,14 +18,13 @@
         <span class="wordmark-mark" aria-hidden="true">L/A</span>
         <span class="wordmark-text">
           <strong>Local AI Benchmark</strong>
-          <em>open weights &middot; ordinary hardware</em>
         </span>
       </a>
       <nav class="masthead-nav" aria-label="Main">
-        <a href="#ledger">Ledger</a>
-        <a href="#method">Method</a>
+        <a href="#ledger">Leaderboard</a>
+        <a href="#method">Benchmarks</a>
         <button type="button" id="nav-compare-btn" class="link-btn hidden">Compare (<span id="compare-count">0</span>)</button>
-        <button type="button" id="open-pr-guide-btn" class="link-btn">Submit a result</button>
+        <button type="button" id="open-pr-guide-btn" class="link-btn">Submit Results</button>
         <a href="https://github.com/SeanDolan0/llm-auto-benchmark" target="_blank" rel="noopener noreferrer">GitHub&nbsp;&#8599;</a>
       </nav>
     </div>
@@ -35,52 +34,45 @@
     <!-- Hero -->
     <section class="hero wrap">
       <div>
-        <p class="kicker">Open weights &middot; consumer hardware &middot; measured locally</p>
-        <h1>What can your machine <em>actually</em> run?</h1>
+        <h1>Local LLM Performance Leaderboard</h1>
         <p class="lede">
-          Most leaderboards rank models nobody can fit on a desk. This one runs five tests against
-          open-weights models on gaming GPUs, Apple Silicon, and plain system RAM &mdash; then publishes
-          the hardware, the raw counts, and the speed next to the score.
+          Empirical benchmark rankings, memory footprints, and generation speeds for open-weight models
+          evaluated on consumer GPUs, Apple Silicon, and system RAM. Every result includes verified
+          hardware specifications and test logs.
         </p>
         <div class="hero-actions">
-          <a href="#ledger" class="btn btn--primary">See the rankings</a>
-          <button type="button" id="cta-pr-guide-btn" class="btn">Run it &amp; submit yours</button>
-        </div>
-        <div class="hero-foot">
-          <span>6&ndash;32&nbsp;GB VRAM</span>
-          <span>CPU-only runs included</span>
-          <span>Every result is a pull request</span>
+          <a href="#ledger" class="btn btn--primary">View Leaderboard</a>
+          <button type="button" id="cta-pr-guide-btn" class="btn">Submit Results</button>
         </div>
       </div>
 
       <aside class="method-card" id="method" aria-labelledby="method-title">
         <div class="method-head">
-          <span id="method-title">What gets measured</span>
+          <span id="method-title">Benchmark Suites</span>
           <span>Weight</span>
         </div>
         <div class="method-row">
-          <div class="method-name">Math<span>GSM8K &middot; strict answer match</span></div>
+          <div class="method-name">Math<span>GSM8K</span></div>
           <div class="method-weight">25%</div>
         </div>
         <div class="method-row">
-          <div class="method-name">Code<span>HumanEval &middot; pass@1</span></div>
+          <div class="method-name">Code<span>HumanEval</span></div>
           <div class="method-weight">25%</div>
         </div>
         <div class="method-row">
-          <div class="method-name">Reasoning<span>ARC Challenge &middot; accuracy</span></div>
+          <div class="method-name">Reasoning<span>ARC Challenge</span></div>
           <div class="method-weight">20%</div>
         </div>
         <div class="method-row">
-          <div class="method-name">Instruction<span>IFEval &middot; constraints met</span></div>
+          <div class="method-name">Instruction<span>IFEval</span></div>
           <div class="method-weight">15%</div>
         </div>
         <div class="method-row">
-          <div class="method-name">Tool use<span>multi-turn function calls</span></div>
+          <div class="method-name">Tool use<span>Tool Calling</span></div>
           <div class="method-weight">15%</div>
         </div>
         <p class="method-note">
-          Overall is the composite recorded by the harness. If a result file only carries per-test
-          scores, the site applies the weights above. Nothing is normalised across hardware.
+          Overall score is the weighted composite across all five benchmark suites.
         </p>
       </aside>
     </section>
@@ -88,43 +80,43 @@
     <!-- Headline numbers -->
     <section class="stats wrap" aria-label="Leaderboard summary">
       <div class="stat-cell">
-        <div class="stat-label">Models on the board</div>
+        <div class="stat-label">Models Tested</div>
         <div class="stat-value" id="stat-model-count">--</div>
-        <div class="stat-sub">Open weights only</div>
+        <div class="stat-sub">All tiers</div>
       </div>
       <div class="stat-cell">
-        <div class="stat-label">Best overall</div>
+        <div class="stat-label">Top Overall</div>
         <div class="stat-value stat-value--rust" id="stat-top-score">--</div>
-        <div class="stat-sub" id="stat-top-model">Loading&hellip;</div>
+        <div class="stat-sub" id="stat-top-model">&mdash;</div>
       </div>
       <div class="stat-cell">
-        <div class="stat-label">Best at code</div>
+        <div class="stat-label">Top Coding</div>
         <div class="stat-value" id="stat-top-coding">--</div>
-        <div class="stat-sub" id="stat-top-coding-model">HumanEval pass@1</div>
+        <div class="stat-sub" id="stat-top-coding-model">&mdash;</div>
       </div>
       <div class="stat-cell">
-        <div class="stat-label">Best at math</div>
+        <div class="stat-label">Top Math</div>
         <div class="stat-value" id="stat-top-math">--</div>
-        <div class="stat-sub" id="stat-top-math-model">GSM8K strict accuracy</div>
+        <div class="stat-sub" id="stat-top-math-model">&mdash;</div>
       </div>
     </section>
 
-    <!-- Ledger -->
+    <!-- Leaderboard -->
     <section class="section wrap" id="ledger">
       <div class="section-rail">
         <span class="rail-no">01</span>
-        <span class="rail-label">The ledger</span>
+        <span class="rail-label">Leaderboard</span>
       </div>
       <div class="section-body">
         <div class="section-head">
-          <h2 class="section-title">Every run, ranked</h2>
-          <p class="section-note">Click a row for the full run record &middot; <span id="last-updated-text">updated recently</span></p>
+          <h2 class="section-title">Leaderboard</h2>
+          <p class="section-note">Select a model to view hardware details and test logs. Last updated: <span id="last-updated-text">&mdash;</span></p>
         </div>
 
         <div class="toolbar">
           <div class="toolbar-top">
             <div class="search">
-              <input type="text" id="search-input" placeholder="Model, architecture, license, backend&hellip;" aria-label="Search models">
+              <input type="text" id="search-input" placeholder="Search by model, architecture, or license&hellip;" aria-label="Search models">
               <button type="button" id="clear-search-btn" class="search-clear hidden" aria-label="Clear search">&times;</button>
             </div>
             <div class="toolbar-actions">
@@ -139,11 +131,11 @@
               <label for="tier-filter">Size</label>
               <select id="tier-filter">
                 <option value="all">All sizes</option>
-                <option value="&lt; 3B">&lt; 3B &mdash; any laptop</option>
-                <option value="3B–7B">3B &ndash; 7B &mdash; 8 GB VRAM / 16 GB RAM</option>
-                <option value="7B–14B">7B &ndash; 14B &mdash; 12&ndash;16 GB VRAM</option>
-                <option value="14B–32B">14B &ndash; 32B &mdash; enthusiast</option>
-                <option value="32B+">32B+ &mdash; offloading / big unified memory</option>
+                <option value="&lt; 3B">&lt; 3B</option>
+                <option value="3B–7B">3B &ndash; 7B</option>
+                <option value="7B–14B">7B &ndash; 14B</option>
+                <option value="14B–32B">14B &ndash; 32B</option>
+                <option value="32B+">32B+</option>
               </select>
             </div>
             <div class="field">
@@ -163,23 +155,23 @@
               </select>
             </div>
             <div class="field">
-              <label for="sort-select">Order</label>
+              <label for="sort-select">Sort by</label>
               <select id="sort-select">
-                <option value="overall_desc">Overall, high to low</option>
-                <option value="gsm8k_desc">Math, high to low</option>
-                <option value="humaneval_desc">Code, high to low</option>
-                <option value="arc_desc">ARC, high to low</option>
-                <option value="ifeval_desc">Instruction, high to low</option>
-                <option value="tool_calling_desc">Tool use, high to low</option>
-                <option value="params_asc">Size, small to large</option>
-                <option value="params_desc">Size, large to small</option>
+                <option value="overall_desc">Overall score</option>
+                <option value="gsm8k_desc">Math (GSM8K)</option>
+                <option value="humaneval_desc">Code (HumanEval)</option>
+                <option value="arc_desc">Reasoning (ARC)</option>
+                <option value="ifeval_desc">Instruction (IFEval)</option>
+                <option value="tool_calling_desc">Tool use</option>
+                <option value="params_asc">Size (smallest first)</option>
+                <option value="params_desc">Size (largest first)</option>
               </select>
             </div>
           </div>
 
           <div class="toolbar-foot">
             <span id="results-count-text">Showing 0 models</span>
-            <span>Click a column header to re-sort</span>
+            <span>Click any column to sort</span>
           </div>
         </div>
 
@@ -193,15 +185,15 @@
                 </th>
                 <th class="col-model" scope="col" data-sort="name">
                   <span class="th-inner"><span class="th-main">Model</span><span class="sort-mark" id="sort-icon-name">&middot;</span></span>
-                  <span class="th-sub">license &middot; precision</span>
+                  <span class="th-sub">License &middot; Precision</span>
                 </th>
                 <th class="col-params" scope="col" data-sort="params">
                   <span class="th-inner"><span class="th-main">Size</span><span class="sort-mark" id="sort-icon-params">&middot;</span></span>
-                  <span class="th-sub">parameters</span>
+                  <span class="th-sub">Parameters</span>
                 </th>
                 <th class="col-overall" scope="col" data-sort="overall">
                   <span class="th-inner"><span class="th-main">Overall</span><span class="sort-mark is-active" id="sort-icon-overall">&darr;</span></span>
-                  <span class="th-sub">weighted</span>
+                  <span class="th-sub">Composite</span>
                 </th>
                 <th class="col-score" scope="col" data-sort="gsm8k">
                   <span class="th-inner"><span class="th-main">Math</span><span class="sort-mark" id="sort-icon-gsm8k">&middot;</span></span>
@@ -213,25 +205,25 @@
                 </th>
                 <th class="col-score" scope="col" data-sort="arc">
                   <span class="th-inner"><span class="th-main">ARC</span><span class="sort-mark" id="sort-icon-arc">&middot;</span></span>
-                  <span class="th-sub">reasoning</span>
+                  <span class="th-sub">Reasoning</span>
                 </th>
                 <th class="col-score" scope="col" data-sort="ifeval">
-                  <span class="th-inner"><span class="th-main">Format</span><span class="sort-mark" id="sort-icon-ifeval">&middot;</span></span>
+                  <span class="th-inner"><span class="th-main">Instruction</span><span class="sort-mark" id="sort-icon-ifeval">&middot;</span></span>
                   <span class="th-sub">IFEval</span>
                 </th>
                 <th class="col-score" scope="col" data-sort="tool_calling">
                   <span class="th-inner"><span class="th-main">Tools</span><span class="sort-mark" id="sort-icon-tool_calling">&middot;</span></span>
-                  <span class="th-sub">multi-turn</span>
+                  <span class="th-sub">Function calls</span>
                 </th>
-                <th class="col-action" scope="col">Open</th>
+                <th class="col-action" scope="col">Details</th>
               </tr>
             </thead>
             <tbody id="table-body">
               <tr>
                 <td colspan="11">
                   <div class="empty-state">
-                    <strong>Reading the ledger&hellip;</strong>
-                    <span>Loading results from static JSON.</span>
+                    <strong>Loading benchmarks&hellip;</strong>
+                    <span>Fetching results dataset.</span>
                   </div>
                 </td>
               </tr>
@@ -245,30 +237,28 @@
     <section class="section wrap" id="figures">
       <div class="section-rail">
         <span class="rail-no">02</span>
-        <span class="rail-label">Figures</span>
+        <span class="rail-label">Analysis</span>
       </div>
       <div class="section-body">
         <div class="section-head">
-          <h2 class="section-title">Shape of the field</h2>
-          <p class="section-note">Tick up to three rows to compare them</p>
+          <h2 class="section-title">Performance Comparison</h2>
+          <p class="section-note">Select up to three models in the table above to compare.</p>
         </div>
         <div class="figures">
           <figure class="figure" style="margin:0">
             <div class="figure-head">
-              <h3>Five axes, one model</h3>
-              <span class="fig-no">Fig. 01</span>
+              <h3>Scores by Benchmark</h3>
             </div>
-            <figcaption class="figure-note">The top three models by overall score, unless specific rows are ticked.</figcaption>
+            <figcaption class="figure-note">Performance comparison across all five benchmark categories.</figcaption>
             <div class="figure-canvas">
               <canvas id="radarChart" aria-label="Radar chart of benchmark scores"></canvas>
             </div>
           </figure>
           <figure class="figure" style="margin:0">
             <div class="figure-head">
-              <h3>Score against size</h3>
-              <span class="fig-no">Fig. 02</span>
+              <h3>Score vs. Model Size</h3>
             </div>
-            <figcaption class="figure-note">Smaller models are on the left. Height is overall score, not capability per gigabyte.</figcaption>
+            <figcaption class="figure-note">Composite overall score plotted against parameter count.</figcaption>
             <div class="figure-canvas">
               <canvas id="barChart" aria-label="Bar chart of overall score by model size"></canvas>
             </div>
@@ -281,19 +271,19 @@
     <section class="section wrap" id="submit">
       <div class="section-rail">
         <span class="rail-no">03</span>
-        <span class="rail-label">Contribute</span>
+        <span class="rail-label">Submit</span>
       </div>
       <div class="section-body">
         <div class="contribute">
           <div>
-            <h2>Run it on your machine. Send the receipt.</h2>
+            <h2>Submit Benchmark Results</h2>
             <p class="lede">
-              The harness records your GPU, VRAM, CPU, RAM, OS, driver, and tokens per second beside
-              the scores. A result without hardware context is an opinion, not a measurement.
+              Run the evaluation harness on your hardware and submit results via pull request.
+              Every submission records your GPU, VRAM, CPU, RAM, OS, driver, and generation throughput.
             </p>
             <div class="contribute-actions">
-              <button type="button" id="cta-pr-guide-btn-secondary" class="btn btn--primary">Read the submission guide</button>
-              <button type="button" id="cta-test-validator-btn" class="btn">Test a result JSON</button>
+              <button type="button" id="cta-pr-guide-btn-secondary" class="btn btn--primary">Submission Guide</button>
+              <button type="button" id="cta-test-validator-btn" class="btn">Validate Result JSON</button>
             </div>
           </div>
 
@@ -303,25 +293,25 @@
                 <span class="step-no">1</span>
                 <div>
                   <strong>Install the harness</strong>
-                  <p>Python 3.10+. Install the extra for whichever backend you use.</p>
+                  <p>Python 3.10+. Install with optional backend dependencies.</p>
                 </div>
               </li>
               <li class="step">
                 <span class="step-no">2</span>
                 <div>
-                  <strong>Point it at a model</strong>
-                  <p>Native llama.cpp, vLLM, transformers, or any OpenAI-compatible server such as Ollama or LM Studio.</p>
+                  <strong>Run evaluation</strong>
+                  <p>Supports llama.cpp, vLLM, transformers, or OpenAI-compatible endpoints like Ollama.</p>
                 </div>
               </li>
               <li class="step">
                 <span class="step-no">3</span>
                 <div>
-                  <strong>Open the pull request</strong>
-                  <p>The JSON lands in <code>website/data/results/</code>. CI checks the schema and the board republishes on merge.</p>
+                  <strong>Submit pull request</strong>
+                  <p>Place the generated JSON in <code>Website/data/results/</code> and open a PR.</p>
                 </div>
               </li>
             </ol>
-            <pre class="code" style="margin-top:14px"><span class="c"># Ollama, LM Studio, vLLM, LocalAI &mdash; anything OpenAI-compatible</span>
+            <pre class="code" style="margin-top:14px"><span class="c"># Run evaluation against an OpenAI-compatible endpoint</span>
 slm-bench evaluate \
   --model-id <span class="p">"qwen2.5-coder:7b"</span> \
   --backend openai \
@@ -336,12 +326,11 @@ slm-bench evaluate \
 
   <footer class="site-foot">
     <div class="wrap">
-      <span>Local AI Benchmark &middot; static site, no server &middot; MIT-licensed harness</span>
+      <span>Local AI Benchmark &middot; MIT License</span>
       <div class="foot-links">
-        <a href="https://github.com/SeanDolan0/llm-auto-benchmark" target="_blank" rel="noopener noreferrer">Repository</a>
-        <a href="https://github.com/SeanDolan0/llm-auto-benchmark/blob/main/README.md" target="_blank" rel="noopener noreferrer">Method</a>
-        <a href="PR_TEMPLATE.md" target="_blank" rel="noopener noreferrer">PR template</a>
-        <a href="https://huggingface.co" target="_blank" rel="noopener noreferrer">Hugging Face</a>
+        <a href="https://github.com/SeanDolan0/llm-auto-benchmark" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com/SeanDolan0/llm-auto-benchmark/blob/main/README.md" target="_blank" rel="noopener noreferrer">Methodology</a>
+        <a href="PR_TEMPLATE.md" target="_blank" rel="noopener noreferrer">PR Template</a>
       </div>
     </div>
   </footer>
@@ -360,7 +349,6 @@ slm-bench evaluate \
     <div class="modal-panel">
       <div class="modal-head">
         <div>
-          <span class="modal-kicker">Run record</span>
           <h3 class="modal-title" id="modal-model-title">Model name</h3>
           <div class="chip-row">
             <span class="chip chip--rust" id="modal-rank-badge">Rank #--</span>
@@ -488,9 +476,8 @@ slm-bench evaluate \
     <div class="modal-panel modal-panel--wide">
       <div class="modal-head">
         <div>
-          <span class="modal-kicker">Side by side</span>
-          <h3 class="modal-title" id="compare-title">Head to head</h3>
-          <p class="modal-sub">Scores, memory footprint, and the machine each model ran on.</p>
+          <h3 class="modal-title" id="compare-title">Model Comparison</h3>
+          <p class="modal-sub">Side-by-side comparison of scores, memory usage, and hardware.</p>
         </div>
         <button type="button" id="compare-modal-close" class="modal-close" aria-label="Close">&times;</button>
       </div>
@@ -503,9 +490,8 @@ slm-bench evaluate \
     <div class="modal-panel">
       <div class="modal-head">
         <div>
-          <span class="modal-kicker">Contribution workflow</span>
-          <h3 class="modal-title" id="pr-guide-title">Submit a model</h3>
-          <p class="modal-sub">One result file, one pull request. No account on this site.</p>
+          <h3 class="modal-title" id="pr-guide-title">Submission Guide</h3>
+          <p class="modal-sub">Submit verified benchmark results via GitHub pull request.</p>
         </div>
         <button type="button" id="pr-guide-close-btn" class="modal-close" aria-label="Close">&times;</button>
       </div>
@@ -531,7 +517,7 @@ cd llm-auto-benchmark</pre>
 
           <div class="pr-step">
             <div class="pr-step-head"><span class="pr-step-no">2</span><strong>Run the evaluation</strong></div>
-            <p>Use the model where it actually lives: llama.cpp, vLLM, transformers, or a local OpenAI-compatible server. Record the footprint.</p>
+            <p>Run against llama.cpp, vLLM, transformers, or a local OpenAI-compatible server. Telemetry is recorded automatically.</p>
             <div class="code-row">
               <pre>slm-bench evaluate \
   --model-id "qwen2.5:7b" \
@@ -544,29 +530,29 @@ cd llm-auto-benchmark</pre>
           </div>
 
           <div class="pr-step">
-            <div class="pr-step-head"><span class="pr-step-no">3</span><strong>Keep the result file</strong></div>
-            <p>The harness writes to <code>website/data/results/&lt;model-slug&gt;.json</code>. Check that the GPU, VRAM, CPU, RAM, OS, and tokens/sec are present. Incomplete telemetry gets sent back.</p>
+            <div class="pr-step-head"><span class="pr-step-no">3</span><strong>Save the result file</strong></div>
+            <p>The harness writes to <code>Website/data/results/&lt;model-slug&gt;.json</code>. Verify hardware telemetry and throughput metrics before submitting.</p>
           </div>
 
           <div class="pr-step">
             <div class="pr-step-head"><span class="pr-step-no">4</span><strong>Commit and open the PR</strong></div>
-            <p>Branch, commit, push, and open a pull request. CI validates the schema; a merge republishes the static board.</p>
+            <p>Branch, commit, push, and open a pull request. CI validates the schema and publishes on merge.</p>
             <div class="code-row">
               <pre>git checkout -b submit/qwen-2.5-7b
-git add website/data/results/Qwen_Qwen2.5-7B-Instruct-GGUF_Q4_K_M.json
+git add Website/data/results/Qwen_Qwen2.5-7B-Instruct-GGUF_Q4_K_M.json
 git commit -m "feat(benchmark): add Qwen2.5-7B-Instruct evaluation"
 git push origin submit/qwen-2.5-7b</pre>
-              <button type="button" class="code-copy" onclick="navigator.clipboard.writeText('git checkout -b submit/qwen-2.5-7b\ngit add website/data/results/Qwen_Qwen2.5-7B-Instruct-GGUF_Q4_K_M.json\ngit commit -m &quot;feat(benchmark): add Qwen2.5-7B-Instruct evaluation&quot;\ngit push origin submit/qwen-2.5-7b')">Copy</button>
+              <button type="button" class="code-copy" onclick="navigator.clipboard.writeText('git checkout -b submit/qwen-2.5-7b\ngit add Website/data/results/Qwen_Qwen2.5-7B-Instruct-GGUF_Q4_K_M.json\ngit commit -m &quot;feat(benchmark): add Qwen2.5-7B-Instruct evaluation&quot;\ngit push origin submit/qwen-2.5-7b')">Copy</button>
             </div>
           </div>
         </div>
 
         <!-- Validator -->
         <div id="pr-tab-validator" class="pr-tab-content hidden">
-          <p class="figure-note">Paste a generated result file to check the required fields before opening the PR.</p>
+          <p class="figure-note">Paste a generated result JSON to check required fields before opening a PR.</p>
           <textarea id="validator-input" class="validator-input" placeholder='{"model": {"model_id": "...", "param_count_b": 7.0}, "summary_scores": {...}}'></textarea>
           <div class="validator-actions">
-            <button type="button" id="validate-btn" class="btn btn--primary">Check fields</button>
+            <button type="button" id="validate-btn" class="btn btn--primary">Validate JSON</button>
             <button type="button" id="load-sample-btn" class="btn">Load a sample</button>
           </div>
           <div id="validator-feedback" class="feedback hidden"></div>
@@ -575,7 +561,7 @@ git push origin submit/qwen-2.5-7b</pre>
         <!-- Template -->
         <div id="pr-tab-template" class="pr-tab-content hidden">
           <div class="section-head" style="margin-bottom:8px">
-            <p class="figure-note" style="margin:0">Paste this into the pull request description.</p>
+            <p class="figure-note" style="margin:0">Pull request description template:</p>
             <button type="button" id="copy-pr-template-btn" class="btn btn--small">Copy template</button>
           </div>
           <pre id="pr-template-preview" class="pr-template">Loading template&hellip;</pre>

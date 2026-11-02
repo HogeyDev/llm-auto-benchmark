@@ -187,12 +187,12 @@ function updateTopStats() {
   if (!allModels || allModels.length === 0) {
     if (modelCountEl) modelCountEl.textContent = '0';
     if (topScoreEl) topScoreEl.textContent = '—';
-    if (topModelEl) topModelEl.textContent = 'Awaiting first test';
+    if (topModelEl) topModelEl.textContent = '—';
     if (topCodingEl) topCodingEl.textContent = '—';
-    if (topCodingModelEl) topCodingModelEl.textContent = 'HumanEval pass@1';
+    if (topCodingModelEl) topCodingModelEl.textContent = '—';
     if (topMathEl) topMathEl.textContent = '—';
-    if (topMathModelEl) topMathModelEl.textContent = 'GSM8K strict accuracy';
-    if (updatedDateEl) updatedDateEl.textContent = 'Awaiting local runs';
+    if (topMathModelEl) topMathModelEl.textContent = '—';
+    if (updatedDateEl) updatedDateEl.textContent = '—';
     return;
   }
 
@@ -332,13 +332,13 @@ function renderTable() {
   tbody.innerHTML = '';
 
   if (allModels.length === 0) {
-    countText.textContent = `0 evaluated models on the board`;
+    countText.textContent = `0 models`;
     tbody.innerHTML = `
       <tr>
         <td colspan="11">
           <div class="empty-state">
-            <strong>No local benchmarks recorded yet</strong>
-            <span>Run <code>slm-bench evaluate</code> locally on your hardware to submit the first verified benchmark.</span>
+            <strong>No benchmarks recorded yet</strong>
+            <span>Run <code>slm-bench evaluate</code> to generate benchmark results.</span>
           </div>
         </td>
       </tr>
@@ -346,15 +346,15 @@ function renderTable() {
     return;
   }
 
-  countText.textContent = `Showing ${filteredModels.length} of ${allModels.length} evaluated models`;
+  countText.textContent = `Showing ${filteredModels.length} of ${allModels.length} models`;
 
   if (filteredModels.length === 0) {
     tbody.innerHTML = `
       <tr>
         <td colspan="11">
           <div class="empty-state">
-            <strong>Nothing matches those filters</strong>
-            <span>Clear the search or widen the size and license ranges.</span>
+            <strong>No matching models</strong>
+            <span>Try adjusting your search query or filter selections.</span>
           </div>
         </td>
       </tr>
@@ -615,7 +615,7 @@ function showCompareModal() {
 
   const selectedModels = allModels.filter(m => selectedModelIds.has(m.model.model_slug || m.model.model_id));
   if (selectedModels.length === 0) {
-    alert("Select two or three models from the ledger to compare them.");
+    alert("Select two or three models from the leaderboard to compare them.");
     return;
   }
 
@@ -1021,7 +1021,7 @@ function runLocalJsonValidation() {
 
   if (!input) {
     feedback.className = 'feedback feedback--error';
-    feedback.innerHTML = '<strong>Nothing to check</strong>Paste a result JSON file first.';
+    feedback.innerHTML = '<strong>No JSON provided</strong>Paste result JSON to validate.';
     feedback.classList.remove('hidden');
     return;
   }
@@ -1047,7 +1047,7 @@ function runLocalJsonValidation() {
       feedback.classList.remove('hidden');
     } else {
       feedback.className = 'feedback feedback--ok';
-      feedback.innerHTML = `<strong>Looks complete</strong>The required fields are present. CI will still check the values and the hardware telemetry.`;
+      feedback.innerHTML = `<strong>Valid</strong>All required fields are present.`;
       feedback.classList.remove('hidden');
     }
   } catch (err) {
