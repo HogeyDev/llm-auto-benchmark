@@ -1,210 +1,219 @@
-# Local AI Benchmark: Evaluating AI for Everyday Hardware 💻🏆
+# Local AI Benchmark
 
-[![GitHub Pages](https://img.shields.io/badge/Leaderboard-GitHub%20Pages-brightgreen.svg)](https://seandolan0.github.io/llm-auto-benchmark/)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Category](https://img.shields.io/badge/Hardware-Everyday%20Local%20AI-purple.svg)](#mission--hardware-philosophy)
-[![CI Tests](https://img.shields.io/badge/Tests-Pytest%20Passing-emerald.svg)](tests/)
+A test harness and leaderboard for open-weights models that fit on hardware people actually own.
 
-An automated evaluation harness, benchmark runner, and community submission pipeline designed specifically for benchmarking **new AI models that normal people can reasonably run on hardware they already have** and publishing validated results to a zero-server **GitHub Pages** leaderboard via automated Pull Requests.
+[Live leaderboard](https://seandolan0.github.io/llm-auto-benchmark/) &middot; [How scoring works](#how-the-score-works) &middot; [Run it](#run-it) &middot; [Submit a result](#submit-a-result)
 
-🌐 **Live Leaderboard:** [https://seandolan0.github.io/llm-auto-benchmark/](https://seandolan0.github.io/llm-auto-benchmark/)
+Most leaderboards measure models on machines nobody has. This one measures them on RTX 3060s,
+MacBooks, and laptops with 16&nbsp;GB of RAM — and publishes the machine next to the score, because
+a score without hardware context is not reproducible.
 
 ---
 
-## 💡 Mission & Hardware Philosophy
+## What is in this repository
 
-Most AI benchmarks evaluate massive frontier models running on expensive enterprise cloud clusters. **Our goal is completely different:**
+Two things that meet at a JSON file:
 
-> **Benchmark new AI models that everyday people can realistically run on the hardware they already own.**
+1. **`slm_bench/`** — a Python CLI that loads a model, runs five short tests, records the host
+   hardware, and writes a standardized result.
+2. **`Website/`** — a static leaderboard that reads those results, ranks them, and lets you inspect
+   every run. No server, no database, no build step.
 
-Whether you are a developer, hobbyist, or student using:
-- 🎮 **A standard gaming PC or laptop** with an NVIDIA RTX 3060, 4060, 4070, 5070, or AMD Radeon GPU (6GB–16GB VRAM)
-- 🍏 **An Apple Silicon Mac** (M1/M2/M3/M4 MacBook Air/Pro, Mac Mini, Studio) with unified memory
-- 💻 **An everyday desktop or laptop** using CPU inference and standard system RAM (16GB–32GB) with fast quantized formats (GGUF, AWQ)
+A result is not accepted by uploading it to a service. It is a pull request against
+`Website/data/results/`. CI checks the schema; a merge republishes the board.
 
-We focus on what actually runs well locally without needing cloud API subscriptions or enterprise server gear. Model inclusion is curated by the project maintainer to ensure every model on the leaderboard is practical for local use.
+## The tests
 
----
+| Column | What it asks | Metric |
+|:--|:--|:--|
+| **Math** | Multi-step word problems; does the model land on the right number? | strict answer match |
+| **Code** | Can it write a Python function that satisfies a docstring and passes tests? | pass@1 |
+| **ARC** | Science and logic questions with one correct answer. | accuracy |
+| **Format** | Can it obey countable constraints — bullet counts, JSON shape, negative rules? | constraints met |
+| **Tools** | Can it pick the right function from a catalog and fill the arguments correctly? | schema-valid calls |
 
-## 🌟 Key Architecture & Highlights
+The bundled harness is deliberately fast: each category runs a small built-in evaluation set, not
+the full public benchmark. Results submitted with the full datasets are welcome — the schema only
+cares that scores, sample counts, and hardware are real.
 
-1. **Focused on Consumer & Everyday Hardware**:
-   - Evaluates models across realistic parameter tiers tailored to consumer machines:
-     - **`< 3B` — Lightweight:** Runs comfortably on almost any modern laptop, PC, or mobile device.
-     - **`3B–7B` — Everyday Sweet Spot:** Ideal for 8GB VRAM GPUs (RTX 3060/4060) and 16GB RAM Macs.
-     - **`7B–14B` — Mid-Range Powerhouse:** Optimal on 12GB–16GB VRAM GPUs (RTX 4070) or 24GB Macs.
-     - **`14B–32B` — Enthusiast Local:** Runs via 4-bit/8-bit quantization on 16GB+ VRAM or unified memory.
-     - **`32B+` — Heavy Local:** Evaluated using GGUF layer-by-layer offloading to test the boundaries of consumer rigs.
-2. **Multi-Backend Inference with Low-VRAM Quantization**:
-   - **`llama.cpp` / GGUF**: Granular layer-by-layer GPU offloading (`n_gpu_layers`) allowing models to run on standard 8GB–16GB consumer GPUs with system RAM fallback.
-   - **`vLLM`**: High-throughput batched inference with PagedAttention and native AWQ / GPTQ / FP8 support.
-   - **`Transformers` + `bitsandbytes`**: Direct evaluation of Hugging Face weights in 4-bit (NF4) or 8-bit precision with automatic device mapping.
-   - **`MockBackend`**: Deterministic simulation for lightning-fast testing and CI/CD validation without requiring GPU hardware.
-3. **Pillar Benchmark Taxonomy & Normalization**:
-   - 📐 **GSM8K (Math & Reasoning)** (25% weight): Multi-step Chain-of-Thought with algebraic extraction and strict verification.
-   - 💻 **HumanEval (Agentic Coding)** (30% weight): Python function synthesis, docstring contract fulfillment, and test assertion execution in an isolated sandbox.
-   - 🧠 **ARC Challenge (Scientific Reasoning)** (20% weight): Advanced scientific and logical question-answering with accuracy normalization.
-   - 📋 **IFEval (Instruction Following)** (15% weight): Strict constraint obedience (JSON schemas, negative constraints, bullet counts).
-   - 🔧 **Multi-Turn Tool Calling** (10% weight): Function schema catalog selection, structured parameter extraction, and execution.
-   - **Composite SLM-Index**: Overall weighted composite score normalized to $0.0 - 100.0\%$.
-4. **Automated GitHub Pages PR Workflow**:
-   - The CLI (`--submit`) clones the leaderboard repository, creates branch `eval/<model-slug>`, commits result JSON to `website/data/results/<model-slug>.json`, pushes, and opens an automated Pull Request with formatted hardware specs and task metrics.
-   - GitHub Actions validates schema and real-world hardware telemetry on every PR.
-   - Once merged into `main`, GitHub Pages automatically updates and redeploys the leaderboard!
-5. **Static Client-Side Leaderboard Application**:
-   - 100% static web application with glassmorphism dark mode, real-time search, multi-column sorting, hardware tier filtering, head-to-head model comparison drawer, Chart.js radar capability diagrams, and deep telemetry inspector modals.
+## How the score works
 
----
-
-## 📂 Repository Structure
+The overall figure shown in the ledger is the `overall` value stored in the result file. If a file
+carries only per-test scores, the aggregator computes:
 
 ```text
-llm-auto-benchmark/
-├── .github/
-│   ├── workflows/
-│   │   ├── deploy-pages.yml         # Aggregates data & deploys website/ to GitHub Pages
-│   │   ├── validate-submission.yml  # Validates PR schema & local hardware telemetry
-│   │   └── ci.yml                   # Automated Pytest suite across Python versions & OS
-│   └── pull_request_template.md     # Auto-populated PR description template
-├── slm_bench/                       # Python evaluation harness & CLI package
-│   ├── backends/                    # Inference engines: llama.cpp, vLLM, HF, Mock
-│   ├── benchmarks/                  # Evaluators: GSM8K, Coding, IFEval, Tool Calling
-│   ├── models/                      # Hardware telemetry & Pydantic result schemas
-│   ├── submission/                  # Git branching & GitHub PR automation
-│   ├── utils/                       # Rich console logging & formatting
-│   └── cli.py                       # Typer CLI entrypoint (`slm-bench`)
-├── tests/                           # Pytest unit tests for evaluation harness
-├── website/                         # Static Leaderboard Application (GitHub Pages root)
-│   ├── data/
-│   │   ├── results/                 # Individual model benchmark results (*.json)
-│   │   │   └── index.json           # Manifest listing all evaluation files
-│   │   └── leaderboard.json         # Master pre-aggregated leaderboard dataset
-│   ├── scripts/
-│   │   ├── aggregate.py             # Compiles data/results/*.json into leaderboard.json
-│   │   └── generate_sample_data.py  # Populates sample evaluation results
-│   ├── app.js                       # Client-side UI logic, charts, filtering & sorting
-│   ├── index.html                   # Single-page application entrypoint
-│   ├── PR_TEMPLATE.md               # Standalone contributor guide
-│   └── style.css                    # Glassmorphism dark-theme styling
-├── pyproject.toml                   # Python build metadata & dependencies
-├── LICENSE                          # MIT License
-└── README.md                        # Documentation
+overall = 0.25·math + 0.25·code + 0.20·arc + 0.15·instruction + 0.15·tools
 ```
 
----
+Inside the harness, results are grouped into four categories and written as `slm_index`:
 
-## 📦 Installation
+```text
+reasoning 25%   coding 30%   instruction 25%   tool_calling 20%
+```
+
+Those are two different things. The harness composite is what the CLI writes; the five-column
+formula is the site's fallback for hand-built result files. The site never recomputes a score that
+is already present.
+
+## What "runs locally" means here
+
+| Size | What it takes, roughly |
+|:--|:--|
+| **&lt; 3B** | Any recent laptop. CPU inference is fine. |
+| **3B–7B** | 8&nbsp;GB VRAM, or 16&nbsp;GB of system RAM. The comfortable default. |
+| **7B–14B** | 12–16&nbsp;GB VRAM, or an Apple Silicon machine with 24&nbsp;GB unified memory. |
+| **14B–32B** | A 4-bit quant on 16–24&nbsp;GB VRAM, or layer offloading into system RAM. |
+| **32B+** | Possible on consumer gear with offloading. Expect it to be slow. |
+
+Model inclusion is curated: open weights, a license that permits local use, and a real path to
+running on one of those machines. A model that technically loads after swapping to disk does not
+belong on the board.
+
+## Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/SeanDolan0/llm-auto-benchmark.git
 cd llm-auto-benchmark
 
-# Install in editable mode
-pip install -e .
-
-# Or install with optional backend dependencies for local execution
-pip install -e ".[transformers,llamacpp]"
-
-# Or install all extras including testing tools
-pip install -e ".[all]"
+pip install -e .                 # CLI only
+pip install -e ".[llamacpp]"     # llama.cpp / GGUF inference
+pip install -e ".[transformers]" # HF weights, bitsandbytes 4-bit / 8-bit
+pip install -e ".[vllm]"         # vLLM with AWQ / GPTQ
+pip install -e ".[all]"          # everything except vLLM, plus pytest
 ```
 
----
+Python 3.10 or newer.
 
-## 🚀 CLI Quick Start
+## Run it
 
-### 1. Inspect Your Host Hardware
-Inspect what hardware your local machine has before running benchmarks:
+Check what the host actually has before trusting a number:
+
 ```bash
 slm-bench info --model-id "Qwen/Qwen2.5-7B-Instruct"
 ```
 
-### 2. Run Benchmark Evaluation Locally
+Do a two-sample run first. The mock backend exercises the whole pipeline without touching a GPU:
+
 ```bash
-# Fast mock evaluation (for testing the pipeline)
 slm-bench evaluate \
   --model-id "meta-llama/Llama-3.2-3B-Instruct" \
-  --backend "mock" \
+  --backend mock \
   --sample-limit 2
+```
 
-# Real evaluation using llama.cpp on consumer GPU or CPU
+A real GGUF run with layer offloading:
+
+```bash
 slm-bench evaluate \
   --model-id "Qwen/Qwen2.5-Coder-7B-Instruct" \
   --quantization "GGUF_Q4_K_M" \
-  --backend "llamacpp"
-
-# Custom runner / OpenAI-compatible endpoint (Ollama, LM Studio, vLLM, LocalAI)
-# Add exact model RAM footprint and runner notes:
-slm-bench evaluate \
-  --model-id "qwen2.5-coder:7b" \
-  --backend "openai" \
-  --endpoint-url "http://localhost:11434/v1" \
+  --backend llamacpp \
   --model-ram-gb 4.8 \
-  --notes "Evaluated via Ollama on RTX 3060 12GB (33 layers offloaded to VRAM)"
+  --notes "RTX 3060 12GB, 33 layers on GPU"
 ```
 
-### 3. Evaluate and Submit via Pull Request
+Anything that speaks the OpenAI chat API works: Ollama, LM Studio, vLLM, LocalAI, or your own
+runner. Pass the footprint explicitly so the result is comparable:
+
+```bash
+slm-bench evaluate \
+  --model-id "qwen2.5-coder:7b" \
+  --backend openai \
+  --endpoint-url "http://localhost:11434/v1" \
+  --model-ram-gb 4.8 \
+  --notes "Ollama on an M2 MacBook Air, 16GB"
+```
+
+Results are written to `Website/data/results/<model-slug>.json` when that directory exists,
+otherwise to `data/results/`. Every file contains the scores, per-test sample counts, tokens per
+second where the backend reports it, and the host telemetry.
+
+## Submit a result
+
+Automated:
+
 ```bash
 slm-bench evaluate \
   --model-id "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B" \
   --quantization "GGUF_Q4_K_M" \
-  --backend "llamacpp" \
+  --backend llamacpp \
   --model-ram-gb 9.5 \
-  --notes "Tested on Apple M3 Max with Metal acceleration" \
+  --notes "Apple M3 Max, Metal, 96GB unified memory" \
   --submit \
   --github-repo "SeanDolan0/llm-auto-benchmark" \
   --token "$GITHUB_TOKEN"
 ```
 
-### 4. Submit an Existing Result File
+That clones the repository, creates an `eval/<model-slug>` branch, commits the JSON, pushes, and
+opens a pull request with the hardware summary filled in.
+
+Manual, if you would rather control the diff:
+
+1. Run the evaluation.
+2. Check the JSON: the GPU, VRAM, CPU, RAM, OS, and (where available) driver are present, and the
+   sample counts are not zero.
+3. Run `python Website/scripts/aggregate.py` to confirm it compiles.
+4. Branch, commit the result file, push, and open a pull request. The template in
+   `Website/PR_TEMPLATE.md` is preloaded by GitHub.
+
+The browser can check the required fields too: open **Submit a result → Check JSON** on the site.
+
+## The site, locally
+
+No Node, no bundler:
+
 ```bash
-slm-bench submit \
-  --result-file "website/data/results/Qwen_Qwen2.5-7B-Instruct-GGUF_Q4_K_M.json" \
-  --github-repo "SeanDolan0/llm-auto-benchmark" \
-  --token "$GITHUB_TOKEN"
+python Website/scripts/aggregate.py   # rebuilds Website/data/leaderboard.json
+python -m http.server -d Website 8000
 ```
 
----
+Then open <http://localhost:8000>. If the JSON cannot be fetched — for example when opening
+`index.html` directly from disk — the page falls back to an embedded dataset so the table, charts,
+and inspector still work.
 
-## 🌐 Local Website Development & Preview
+## Repository layout
 
-Because the leaderboard website is completely static, no build step or Node.js environment is required:
-
-```bash
-# Aggregate latest benchmark results
-python website/scripts/aggregate.py
-
-# Launch local preview web server
-python -m http.server -d website 8000
+```text
+.
+├── .github/workflows/
+│   ├── ci.yml                    # pytest on every push and pull request
+│   ├── deploy-pages.yml          # aggregates results, deploys Website/ to Pages
+│   └── validate-submission.yml   # validates result schema and telemetry on PRs
+├── slm_bench/
+│   ├── backends/                 # llama.cpp, vLLM, transformers, OpenAI-compatible, mock
+│   ├── benchmarks/               # reasoning, coding, instruction, tool-calling tasks
+│   ├── models/                   # hardware detection, HF metadata, Pydantic schema
+│   ├── submission/               # branch + pull request automation
+│   ├── website_template/         # optional scaffold for a new leaderboard
+│   └── cli.py                    # `slm-bench`
+├── tests/                        # unit tests for the harness and submission flow
+├── Website/
+│   ├── data/results/             # one JSON file per evaluation
+│   ├── data/leaderboard.json     # generated aggregate
+│   ├── scripts/aggregate.py      # results -> leaderboard
+│   ├── index.html                # the ledger
+│   ├── style.css                 # paper-and-ink stylesheet
+│   └── app.js                    # filtering, sorting, charts, inspector
+├── pyproject.toml
+└── LICENSE
 ```
 
-Open [http://localhost:8000](http://localhost:8000) in your web browser.
-
----
-
-## 🤝 Contributing Benchmark Results
-
-We welcome community benchmark submissions for open-weights models tested on **common local hardware**!
-
-1. Fork and clone the repository.
-2. Run your benchmark locally using `slm-bench evaluate`. The tool automatically records your GPU, VRAM, CPU, and RAM telemetry.
-3. Save or copy your verified result JSON into `website/data/results/<model_slug>.json`.
-4. Run `python website/scripts/aggregate.py` to verify compilation.
-5. Open a Pull Request. GitHub Actions will automatically validate your submission schema. The maintainer will review submissions to determine if the model is suitable for the leaderboard, and GitHub Pages will deploy the updated leaderboard upon merge.
-
----
-
-## 🧪 Running Tests
+## Tests
 
 ```bash
 pytest -v
 ```
 
----
+## A note on the numbers
 
-## 📄 License
+This is a small, opinionated benchmark, not a peer-reviewed evaluation. A two-point gap between two
+models is usually noise. Read the per-test scores, the sample counts, and the machine before drawing
+a conclusion. Results without telemetry or sample counts are demos, not measurements.
 
-This project is licensed under the [MIT License](LICENSE).
-Leaderboard benchmark data contributed by the community is shared under open and permissive data licenses.
+If you find a result that looks wrong, open an issue with the evaluation ID. Corrections are more
+useful than silent re-runs.
+
+## License
+
+Harness code: [MIT](LICENSE). Benchmark data contributed by the community stays under the license
+of the model it describes and is published for comparison, not as a warranty of fitness.

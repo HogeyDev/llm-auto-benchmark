@@ -366,35 +366,32 @@ const EMBEDDED_FALLBACK_DATA = {
 };
 
 // Markdown PR template content
-const PR_TEMPLATE_TEXT = `### Model Submission Checklist
-- [x] Model can reasonably run on common local hardware (consumer GPUs, Apple Silicon, or system RAM).
-- [x] Verified hardware environment specs included (GPU, VRAM, CPU, RAM).
-- [x] Benchmark evaluations were run with reproducible harness settings.
-- [x] Result JSON file follows the standardized schema.
-- [x] Result file placed in \`/data/results/<organization>_<model_slug>.json\` (or \`website/data/results/\`).
-- [x] No proprietary or restricted access models (must have open weights).
+const PR_TEMPLATE_TEXT = `### What this adds
+- **Model:** org/model
+- **Precision:** GGUF Q4_K_M
+- **Hardware:** NVIDIA RTX 3060 12GB / Apple M2, 16GB
+- **Result file:** \`Website/data/results/<model-slug>.json\`
 
-### Evaluation Summary
-- **Model ID:** [e.g., Qwen/Qwen2.5-7B-Instruct]
-- **Hugging Face Link:** [e.g., https://huggingface.co/Qwen/Qwen2.5-7B-Instruct]
-- **Parameter Count:** [e.g., 7.61B]
-- **Quantization:** [e.g., GGUF Q4_K_M]
-- **License:** [e.g., Apache-2.0]
+### Checklist
+- [ ] Open weights, and the license permits local use.
+- [ ] Ran on consumer hardware: a consumer GPU, Apple Silicon, or system RAM.
+- [ ] GPU, VRAM, CPU, RAM, and OS are recorded in the JSON.
+- [ ] Sample counts are non-zero and match the run.
+- [ ] Only the result file changed in this pull request.
 
-### Hardware Environment
-| Resource | Specification |
-|:---|:---|
-| **GPU Model** | NVIDIA RTX 4090 (24GB) |
-| **CPU** | AMD Ryzen 9 7950X |
-| **RAM** | 64 GB DDR5 |
-| **OS / CUDA** | Ubuntu 24.04 LTS / CUDA 12.4 |
-| **Inference Backend** | llama.cpp |
+### Hardware
+| Resource | Value |
+|:--|:--|
+| GPU | NVIDIA RTX 3060 12GB |
+| CPU | AMD Ryzen 5 5600X, 6 cores |
+| System RAM | 32 GB |
+| OS / driver | Ubuntu 24.04 / CUDA 12.4 / 550.54 |
+| Backend | llama.cpp, 33 layers offloaded |
 
-### Proof of Run
-Attached evaluation log snippet and hash confirmation:
+### Log tail
 \`\`\`text
-[2026-11-01 14:05:00] Initialized llama.cpp backend with -ngl 99
-[2026-11-01 14:22:10] Benchmark suite finished. Overall Score: 87.65%
+[2026-11-02 10:00:15] Model loaded
+[2026-11-02 10:11:02] Benchmark suite finished. SLM-Index: 82.10
 \`\`\`
 `;
 
@@ -661,10 +658,11 @@ function renderTable() {
   if (filteredModels.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="11" class="text-center py-16 text-slate-400">
-          <i class="fa-solid fa-filter-circle-xmark text-3xl text-slate-600 mb-2"></i>
-          <div class="text-sm font-semibold text-slate-300">No models match the current filters</div>
-          <div class="text-xs text-slate-500 mt-1">Try clearing your search query or broadening parameter tiers.</div>
+        <td colspan="11">
+          <div class="empty-state">
+            <strong>Nothing matches those filters</strong>
+            <span>Clear the search or widen the size and license ranges.</span>
+          </div>
         </td>
       </tr>
     `;
@@ -677,7 +675,7 @@ function renderTable() {
     const isSelected = selectedModelIds.has(m.model_slug || m.model_id);
 
     const tr = document.createElement('tr');
-    tr.className = `leaderboard-row cursor-pointer transition ${isSelected ? 'bg-indigo-950/30' : ''}`;
+    tr.className = `model-row${isSelected ? ' is-selected' : ''}`;
     
     // Clicking anywhere on row (except checkbox & link) opens modal
     tr.onclick = (e) => {
@@ -685,67 +683,55 @@ function renderTable() {
       showModelModal(item);
     };
 
-    // Rank Badge logic
-    let rankBadge = `<span class="font-mono text-slate-400 text-xs font-semibold">#${item.rank}</span>`;
-    if (item.rank === 1) {
-      rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/50 text-xs font-extrabold" title="Rank #1"><i class="fa-solid fa-crown text-[10px]"></i></span>`;
-    } else if (item.rank === 2) {
-      rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-400/20 text-slate-200 border border-slate-400/50 text-xs font-bold" title="Rank #2">2</span>`;
-    } else if (item.rank === 3) {
-      rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-700/20 text-amber-400 border border-amber-700/50 text-xs font-bold" title="Rank #3">3</span>`;
+    // Rank marker
+    let rankBadge = `<span class="rank">${item.rank}</span>`;
+    if (item.rank === 1 || item.rank === 2 || item.rank === 3) {
+      rankBadge = `<span class="rank rank--${item.rank}">${item.rank}</span>`;
     }
 
-    // Score coloring helper
+    // Score colour ramp
     const getScoreBadge = (score) => {
-      let colorClass = 'text-slate-300';
-      if (score >= 90) colorClass = 'text-emerald-400 font-bold';
-      else if (score >= 80) colorClass = 'text-cyan-300 font-semibold';
-      else if (score >= 70) colorClass = 'text-indigo-300';
-      return `<span class="${colorClass}">${score.toFixed(1)}%</span>`;
+      let colorClass = 'score-val--low';
+      if (score >= 80) colorClass = 'score-val--high';
+      else if (score >= 70) colorClass = 'score-val--mid';
+      return `<span class="score-val ${colorClass}">${score.toFixed(1)}%</span>`;
     };
 
     tr.innerHTML = `
-      <td class="px-3 py-3 text-center no-modal-click" onclick="event.stopPropagation()">
-        <input type="checkbox" class="model-select-cb rounded bg-slate-900 border-slate-700 text-indigo-500 focus:ring-0 focus:ring-offset-0 cursor-pointer" 
-          data-id="${m.model_slug || m.model_id}" ${isSelected ? 'checked' : ''}>
+      <td class="col-check no-modal-click" onclick="event.stopPropagation()">
+        <input type="checkbox" class="checkbox model-select-cb"
+          data-id="${m.model_slug || m.model_id}" ${isSelected ? 'checked' : ''}
+          aria-label="Select ${m.model_id} for comparison">
       </td>
-      <td class="px-3 py-3 text-center">${rankBadge}</td>
-      <td class="px-4 py-3">
-        <div class="flex items-center space-x-2">
-          <a href="${m.hf_url}" target="_blank" rel="noopener noreferrer" 
-            class="no-modal-click text-slate-100 hover:text-cyan-400 font-bold text-sm tracking-tight transition flex items-center gap-1.5"
-            title="Open repository on Hugging Face" onclick="event.stopPropagation()">
-            <span class="truncate max-w-[210px] sm:max-w-[280px]">${m.model_id}</span>
-            <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-slate-500 hover:text-cyan-300"></i>
-          </a>
+      <td class="col-rank cell-rank">${rankBadge}</td>
+      <td class="col-model">
+        <a href="${m.hf_url}" target="_blank" rel="noopener noreferrer"
+          class="model-link no-modal-click" title="Open the model card on Hugging Face"
+          onclick="event.stopPropagation()">
+          <span class="truncate">${m.model_id}</span>
+          <span class="model-arrow">&#8599;</span>
+        </a>
+        <div class="model-meta">
+          <span class="tag">${m.architecture}</span>
+          <span class="tag tag--quant">${m.quantization}</span>
+          <span class="tag">${m.license}</span>
+          ${item.notes ? `<span class="tag tag--notes">notes</span>` : ''}
         </div>
-        <div class="flex items-center flex-wrap gap-1.5 mt-1 text-[11px] text-slate-400">
-          <span class="inline-block px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono text-[10px]">${m.architecture}</span>
-          <span class="inline-block px-1.5 py-0.2 rounded bg-slate-800/80 text-cyan-300 border border-cyan-900/60 font-mono text-[10px]">${m.quantization}</span>
-          <span class="text-slate-500 text-[10px] truncate max-w-[120px]">${m.license}</span>
-          ${item.notes ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-amber-950/40 text-amber-300 border border-amber-800/60 font-mono text-[10px]" title="Evaluation notes attached"><i class="fa-solid fa-note-sticky text-[9px]"></i>Notes</span>` : ''}
-        </div>
       </td>
-      <td class="px-3 py-3 font-mono text-xs">
-        <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700">
-          ${m.param_count_b ? m.param_count_b.toFixed(1) + 'B' : 'N/A'}
-        </span>
-        ${m.model_ram_gb ? `<span class="block text-[10px] text-emerald-400 font-mono mt-0.5">${m.model_ram_gb.toFixed(1)} GB RAM</span>` : ''}
+      <td class="col-params">
+        <span class="param">${m.param_count_b ? m.param_count_b.toFixed(1) + 'B' : 'N/A'}</span>
+        ${m.model_ram_gb ? `<span class="param-ram">${m.model_ram_gb.toFixed(1)} GB</span>` : ''}
       </td>
-      <td class="px-4 py-3 text-right bg-cyan-950/20 border-x border-slate-800/50">
-        <span class="inline-block px-2.5 py-1 rounded-lg text-sm font-extrabold text-cyan-300 bg-cyan-950/80 border border-cyan-700/60 shadow-sm">
-          ${s.overall.toFixed(1)}%
-        </span>
+      <td class="col-overall">
+        <span class="score-overall">${s.overall.toFixed(1)}%</span>
       </td>
-      <td class="px-3 py-3 text-right font-mono text-xs">${getScoreBadge(s.gsm8k)}</td>
-      <td class="px-3 py-3 text-right font-mono text-xs">${getScoreBadge(s.humaneval)}</td>
-      <td class="px-3 py-3 text-right font-mono text-xs">${getScoreBadge(s.arc)}</td>
-      <td class="px-3 py-3 text-right font-mono text-xs">${getScoreBadge(s.ifeval)}</td>
-      <td class="px-3 py-3 text-right font-mono text-xs">${getScoreBadge(s.tool_calling)}</td>
-      <td class="px-3 py-3 text-center no-modal-click" onclick="event.stopPropagation()">
-        <button class="inspect-btn p-1.5 rounded-lg text-slate-400 hover:text-white bg-slate-800/70 hover:bg-slate-700 transition text-xs" title="Inspect model telemetry">
-          <i class="fa-solid fa-chart-simple"></i>
-        </button>
+      <td class="col-score">${getScoreBadge(s.gsm8k)}</td>
+      <td class="col-score">${getScoreBadge(s.humaneval)}</td>
+      <td class="col-score">${getScoreBadge(s.arc)}</td>
+      <td class="col-score">${getScoreBadge(s.ifeval)}</td>
+      <td class="col-score">${getScoreBadge(s.tool_calling)}</td>
+      <td class="col-action no-modal-click" onclick="event.stopPropagation()">
+        <button type="button" class="icon-btn inspect-btn" title="Open the full run record" aria-label="Inspect ${m.model_id}">&rarr;</button>
       </td>
     `;
 
@@ -865,23 +851,21 @@ function showModelModal(item) {
 
   breakdownDiv.innerHTML = taskDefinitions.map(t => {
     const taskData = tasks[t.key] || {};
-    const passed = taskData.passed_samples ? ` &bull; Passed: ${taskData.passed_samples}/${taskData.total_samples || '?'}` : '';
-    const speed = taskData.avg_tokens_per_sec ? ` &bull; ${taskData.avg_tokens_per_sec} tok/s` : '';
+    const passed = taskData.passed_samples ? `passed ${taskData.passed_samples}/${taskData.total_samples || '?'}` : '';
+    const speed = taskData.avg_tokens_per_sec ? `${taskData.avg_tokens_per_sec} tok/s` : '';
 
     return `
-      <div class="bg-[#050811] p-3.5 rounded-xl border border-slate-800">
-        <div class="flex items-center justify-between mb-1 text-xs">
+      <div class="task">
+        <div class="task-head">
           <div>
-            <span class="font-bold text-slate-200">${t.label}</span>
-            <span class="text-[11px] text-slate-500 ml-1">${t.desc}</span>
+            <span class="task-name">${t.label}</span>
+            <span class="task-desc">${t.desc}</span>
           </div>
-          <span class="font-extrabold text-cyan-400 font-mono text-sm">${t.score.toFixed(1)}%</span>
+          <span class="task-score">${t.score.toFixed(1)}%</span>
         </div>
-        <div class="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden my-1.5">
-          <div class="bg-gradient-to-r from-cyan-500 to-emerald-400 h-2 rounded-full transition-all duration-500" style="width: ${t.score}%"></div>
-        </div>
-        <div class="text-[10px] text-slate-400 flex items-center justify-between">
-          <span>Metric: ${taskData.metric || 'accuracy'}${passed}</span>
+        <div class="task-bar"><div class="task-fill" style="width: ${t.score}%"></div></div>
+        <div class="task-meta">
+          <span>${taskData.metric || 'accuracy'}${passed ? ' &middot; ' + passed : ''}</span>
           <span>${speed}</span>
         </div>
       </div>
@@ -919,11 +903,7 @@ function showModelModal(item) {
 
 function switchModalTab(tabId) {
   document.querySelectorAll('.modal-tab-btn').forEach(btn => {
-    if (btn.getAttribute('data-tab') === tabId) {
-      btn.className = 'modal-tab-btn py-3 px-3 border-b-2 border-cyan-400 text-cyan-300 font-semibold';
-    } else {
-      btn.className = 'modal-tab-btn py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200';
-    }
+    btn.classList.toggle('is-active', btn.getAttribute('data-tab') === tabId);
   });
 
   document.querySelectorAll('.modal-tab-content').forEach(content => {
@@ -942,81 +922,69 @@ function showCompareModal() {
 
   const selectedModels = allModels.filter(m => selectedModelIds.has(m.model.model_slug || m.model.model_id));
   if (selectedModels.length === 0) {
-    alert("Please select 2 or 3 models from the leaderboard to compare.");
+    alert("Select two or three models from the ledger to compare them.");
     return;
   }
 
-  const columns = ['Model', 'Parameters', 'Overall Score', 'GSM8K (Math)', 'HumanEval (Coding)', 'ARC (Reasoning)', 'IFEval', 'Tool Calling', 'Architecture', 'Quantization', 'License', 'GPU Hardware'];
+  const scoreRows = [
+    ['Math', 'gsm8k'],
+    ['Code', 'humaneval'],
+    ['ARC', 'arc'],
+    ['Format', 'ifeval'],
+    ['Tool use', 'tool_calling']
+  ];
 
   container.innerHTML = `
-    <table class="w-full text-xs text-left border-collapse">
+    <table class="compare">
       <thead>
-        <tr class="border-b border-slate-800 bg-[#050811]">
-          <th class="p-3 text-slate-400 uppercase font-semibold">Metric / Feature</th>
+        <tr>
+          <th>Metric</th>
           ${selectedModels.map(m => `
-            <th class="p-3 text-cyan-300 font-bold text-sm">
-              <div>${m.model.model_id}</div>
-              <div class="text-[10px] text-slate-400 font-normal">Rank #${m.rank}</div>
+            <th>
+              <div class="compare-model">${m.model.model_id}</div>
+              <div class="compare-rank">Rank #${m.rank} &middot; ${m.model.param_count_b}B</div>
             </th>
           `).join('')}
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-800 text-slate-200">
-        <tr class="bg-slate-900/40">
-          <td class="p-3 font-semibold text-slate-300">Overall Score</td>
-          ${selectedModels.map(m => `<td class="p-3 font-extrabold text-cyan-400 text-base font-mono">${m.scores.overall.toFixed(1)}%</td>`).join('')}
+      <tbody>
+        <tr class="is-total">
+          <td class="metric-name">Overall</td>
+          ${selectedModels.map(m => `<td class="total">${m.scores.overall.toFixed(1)}%</td>`).join('')}
+        </tr>
+        ${scoreRows.map(([label, key]) => `
+          <tr>
+            <td class="metric-name">${label}</td>
+            ${selectedModels.map(m => `<td class="num">${m.scores[key].toFixed(1)}%</td>`).join('')}
+          </tr>
+        `).join('')}
+        <tr>
+          <td class="metric-name">Parameters</td>
+          ${selectedModels.map(m => `<td class="num">${m.model.param_count_b}B &middot; ${m.model.param_tier}</td>`).join('')}
         </tr>
         <tr>
-          <td class="p-3 font-semibold text-slate-300">GSM8K (Math)</td>
-          ${selectedModels.map(m => `<td class="p-3 font-mono font-semibold">${m.scores.gsm8k.toFixed(1)}%</td>`).join('')}
+          <td class="metric-name">Model footprint</td>
+          ${selectedModels.map(m => `<td class="num">${m.model.model_ram_gb ? m.model.model_ram_gb.toFixed(1) + ' GB' : (m.hardware?.model_ram_gb ? m.hardware.model_ram_gb.toFixed(1) + ' GB' : 'N/A')}</td>`).join('')}
         </tr>
         <tr>
-          <td class="p-3 font-semibold text-slate-300">HumanEval (Coding)</td>
-          ${selectedModels.map(m => `<td class="p-3 font-mono font-semibold">${m.scores.humaneval.toFixed(1)}%</td>`).join('')}
+          <td class="metric-name">Precision</td>
+          ${selectedModels.map(m => `<td class="num">${m.model.quantization}</td>`).join('')}
         </tr>
         <tr>
-          <td class="p-3 font-semibold text-slate-300">ARC (Reasoning)</td>
-          ${selectedModels.map(m => `<td class="p-3 font-mono font-semibold">${m.scores.arc.toFixed(1)}%</td>`).join('')}
+          <td class="metric-name">Architecture</td>
+          ${selectedModels.map(m => `<td class="num">${m.model.architecture}</td>`).join('')}
         </tr>
         <tr>
-          <td class="p-3 font-semibold text-slate-300">IFEval</td>
-          ${selectedModels.map(m => `<td class="p-3 font-mono font-semibold">${m.scores.ifeval.toFixed(1)}%</td>`).join('')}
+          <td class="metric-name">Backend</td>
+          ${selectedModels.map(m => `<td class="num">${m.model.backend}</td>`).join('')}
         </tr>
         <tr>
-          <td class="p-3 font-semibold text-slate-300">Tool Calling</td>
-          ${selectedModels.map(m => `<td class="p-3 font-mono font-semibold">${m.scores.tool_calling.toFixed(1)}%</td>`).join('')}
-        </tr>
-        <tr class="bg-slate-900/40">
-          <td class="p-3 font-semibold text-slate-300">Parameter Count</td>
-          ${selectedModels.map(m => `<td class="p-3 font-mono">${m.model.param_count_b}B (${m.model.param_tier})</td>`).join('')}
+          <td class="metric-name">GPU</td>
+          ${selectedModels.map(m => `<td class="num">${m.hardware?.gpu_name || 'N/A'}</td>`).join('')}
         </tr>
         <tr>
-          <td class="p-3 font-semibold text-slate-300">Model RAM / VRAM</td>
-          ${selectedModels.map(m => `<td class="p-3 font-mono text-emerald-400 font-semibold">${m.model.model_ram_gb ? m.model_ram_gb.toFixed(1) + ' GB' : (m.hardware?.model_ram_gb ? m.hardware.model_ram_gb.toFixed(1) + ' GB' : 'N/A')}</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="p-3 font-semibold text-slate-300">Quantization</td>
-          ${selectedModels.map(m => `<td class="p-3 font-mono text-cyan-300">${m.model.quantization}</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="p-3 font-semibold text-slate-300">Architecture</td>
-          ${selectedModels.map(m => `<td class="p-3 text-slate-300">${m.model.architecture}</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="p-3 font-semibold text-slate-300">License</td>
-          ${selectedModels.map(m => `<td class="p-3 text-slate-300">${m.model.license}</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="p-3 font-semibold text-slate-300">Inference Backend</td>
-          ${selectedModels.map(m => `<td class="p-3 font-mono text-slate-300">${m.model.backend}</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="p-3 font-semibold text-slate-300">GPU Hardware</td>
-          ${selectedModels.map(m => `<td class="p-3 text-slate-300">${m.hardware?.gpu_name || 'N/A'}</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="p-3 font-semibold text-slate-300">Evaluation Notes</td>
-          ${selectedModels.map(m => `<td class="p-3 text-xs text-slate-300 italic">${m.notes || 'None'}</td>`).join('')}
+          <td class="metric-name">Notes</td>
+          ${selectedModels.map(m => `<td class="num">${m.notes || '—'}</td>`).join('')}
         </tr>
       </tbody>
     </table>
@@ -1038,9 +1006,9 @@ function renderCharts() {
 
   const radarLabels = ['GSM8K (Math)', 'HumanEval (Code)', 'ARC (Reasoning)', 'IFEval (Format)', 'Tool Calling'];
   const colors = [
-    { bg: 'rgba(6, 182, 212, 0.25)', border: '#06b6d4' },
-    { bg: 'rgba(168, 85, 247, 0.25)', border: '#a855f7' },
-    { bg: 'rgba(16, 185, 129, 0.25)', border: '#10b981' }
+    { bg: 'rgba(163, 58, 28, 0.16)', border: '#a33a1c' },
+    { bg: 'rgba(47, 90, 70, 0.16)', border: '#2f5a46' },
+    { bg: 'rgba(138, 103, 20, 0.16)', border: '#8a6714' }
   ];
 
   const radarCtx = document.getElementById('radarChart').getContext('2d');
@@ -1061,9 +1029,10 @@ function renderCharts() {
         ],
         backgroundColor: colors[idx % colors.length].bg,
         borderColor: colors[idx % colors.length].border,
-        borderWidth: 2,
+        borderWidth: 1.5,
         pointBackgroundColor: colors[idx % colors.length].border,
-        pointBorderColor: '#fff',
+        pointBorderColor: '#f8f5ec',
+        pointRadius: 2.5,
         pointHoverRadius: 5
       }))
     },
@@ -1072,10 +1041,10 @@ function renderCharts() {
       maintainAspectRatio: false,
       scales: {
         r: {
-          angleLines: { color: 'rgba(255, 255, 255, 0.08)' },
-          grid: { color: 'rgba(255, 255, 255, 0.08)' },
-          pointLabels: { color: '#94a3b8', font: { size: 10, family: 'Plus Jakarta Sans' } },
-          ticks: { backdropColor: 'transparent', color: '#64748b', stepSize: 20, font: { size: 9 } },
+          angleLines: { color: 'rgba(28, 26, 20, 0.12)' },
+          grid: { color: 'rgba(28, 26, 20, 0.12)' },
+          pointLabels: { color: '#4b473c', font: { size: 9, family: 'IBM Plex Mono' } },
+          ticks: { backdropColor: 'transparent', color: '#7a7464', stepSize: 20, font: { size: 8, family: 'IBM Plex Mono' } },
           suggestedMin: 50,
           suggestedMax: 100
         }
@@ -1083,58 +1052,72 @@ function renderCharts() {
       plugins: {
         legend: {
           position: 'top',
-          labels: { color: '#f1f5f9', font: { size: 11, family: 'Plus Jakarta Sans' }, boxWidth: 12 }
+          labels: { color: '#1c1a14', font: { size: 10, family: 'IBM Plex Sans' }, boxWidth: 10, boxHeight: 10 }
         }
       }
     }
   });
 
-  // Bar Chart: Parameter Efficiency & Overall Score Distribution
+  // Scatter: overall score against parameter count
   const barCtx = document.getElementById('barChart').getContext('2d');
   if (barChartInstance) barChartInstance.destroy();
 
   const sortedBySize = [...allModels].sort((a, b) => (a.model.param_count_b || 0) - (b.model.param_count_b || 0));
 
   barChartInstance = new Chart(barCtx, {
-    type: 'bar',
+    type: 'scatter',
     data: {
-      labels: sortedBySize.map(m => `${(m.model.model_id.split('/')[1] || m.model.model_id).substring(0, 14)} (${m.model.param_count_b}B)`),
       datasets: [{
-        label: 'Overall Benchmark Score (%)',
-        data: sortedBySize.map(m => m.scores.overall),
+        label: 'Models',
+        data: sortedBySize.map(m => ({
+          x: m.model.param_count_b || 0,
+          y: m.scores.overall,
+          model: m.model.model_id
+        })),
         backgroundColor: sortedBySize.map(m => {
-          if (m.scores.overall >= 85) return 'rgba(16, 185, 129, 0.7)';
-          if (m.scores.overall >= 80) return 'rgba(6, 182, 212, 0.7)';
-          if (m.scores.overall >= 75) return 'rgba(99, 102, 241, 0.7)';
-          return 'rgba(148, 163, 184, 0.5)';
+          if (m.scores.overall >= 85) return 'rgba(163, 58, 28, 0.85)';
+          if (m.scores.overall >= 80) return 'rgba(138, 103, 20, 0.72)';
+          return 'rgba(122, 116, 100, 0.55)';
         }),
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(28, 26, 20, 0.35)',
         borderWidth: 1,
-        borderRadius: 4
+        pointRadius: 5,
+        pointHoverRadius: 7
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       scales: {
+        x: {
+          min: 0,
+          title: {
+            display: true,
+            text: 'parameters (billions)',
+            color: '#6a6455',
+            font: { size: 9, family: 'IBM Plex Mono' }
+          },
+          grid: { color: 'rgba(28, 26, 20, 0.08)' },
+          ticks: { color: '#6a6455', font: { size: 9, family: 'IBM Plex Mono' } }
+        },
         y: {
-          beginAtZero: false,
           min: 50,
           max: 100,
-          grid: { color: 'rgba(255, 255, 255, 0.05)' },
-          ticks: { color: '#94a3b8', font: { size: 10 } }
-        },
-        x: {
-          grid: { display: false },
-          ticks: { color: '#94a3b8', font: { size: 9 }, maxRotation: 35, minRotation: 20 }
+          title: {
+            display: true,
+            text: 'overall score (%)',
+            color: '#6a6455',
+            font: { size: 9, family: 'IBM Plex Mono' }
+          },
+          grid: { color: 'rgba(28, 26, 20, 0.08)' },
+          ticks: { color: '#6a6455', font: { size: 9, family: 'IBM Plex Mono' } }
         }
       },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: (items) => sortedBySize[items[0].dataIndex].model.model_id,
-            label: (item) => `Score: ${item.raw}% | Size: ${sortedBySize[item.dataIndex].model.param_count_b}B`
+            label: (ctx) => `${ctx.raw.model} · ${ctx.raw.y}%`
           }
         }
       }
@@ -1246,7 +1229,8 @@ function setupEventListeners() {
   const prModal = document.getElementById('pr-guide-modal');
   const openPrBtns = [
     document.getElementById('open-pr-guide-btn'),
-    document.getElementById('cta-pr-guide-btn')
+    document.getElementById('cta-pr-guide-btn'),
+    document.getElementById('cta-pr-guide-btn-secondary')
   ];
   openPrBtns.forEach(btn => {
     if (btn) btn.addEventListener('click', () => {
@@ -1319,11 +1303,7 @@ function setupEventListeners() {
 
 function switchPRTab(tabId) {
   document.querySelectorAll('.pr-tab-btn').forEach(btn => {
-    if (btn.getAttribute('data-prtab') === tabId) {
-      btn.className = 'pr-tab-btn py-3 px-3 border-b-2 border-cyan-400 text-cyan-300 font-semibold';
-    } else {
-      btn.className = 'pr-tab-btn py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200';
-    }
+    btn.classList.toggle('is-active', btn.getAttribute('data-prtab') === tabId);
   });
 
   document.querySelectorAll('.pr-tab-content').forEach(c => {
@@ -1341,8 +1321,8 @@ function runLocalJsonValidation() {
   const feedback = document.getElementById('validator-feedback');
 
   if (!input) {
-    feedback.className = 'p-3 rounded-lg text-xs bg-red-950/70 border border-red-800 text-red-300';
-    feedback.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> Please paste JSON text to validate.';
+    feedback.className = 'feedback feedback--error';
+    feedback.innerHTML = '<strong>Nothing to check</strong>Paste a result JSON file first.';
     feedback.classList.remove('hidden');
     return;
   }
@@ -1359,26 +1339,26 @@ function runLocalJsonValidation() {
       if (!data.model.license) errors.push("Missing 'model.license'.");
     }
 
-    if (!data.hardware) errors.push("Missing 'hardware' specification object (GPU, CPU, RAM).");
-    if (!data.summary_scores && !data.tasks) errors.push("Missing benchmark evaluation scores ('summary_scores' or 'tasks').");
+    if (!data.hardware) errors.push("Missing 'hardware' (GPU, CPU, RAM).");
+    if (!data.summary_scores && !data.tasks) errors.push("Missing scores ('summary_scores' or 'tasks').");
 
     if (errors.length > 0) {
-      feedback.className = 'p-3 rounded-lg text-xs bg-red-950/70 border border-red-800 text-red-300';
-      feedback.innerHTML = `<div class="font-bold mb-1"><i class="fa-solid fa-circle-xmark mr-1.5"></i> Validation Failed (${errors.length} issues):</div><ul class="list-disc pl-5 space-y-0.5">${errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
+      feedback.className = 'feedback feedback--error';
+      feedback.innerHTML = `<strong>${errors.length} field${errors.length === 1 ? '' : 's'} missing</strong><ul>${errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
       feedback.classList.remove('hidden');
     } else {
-      feedback.className = 'p-3 rounded-lg text-xs bg-emerald-950/70 border border-emerald-800 text-emerald-300';
-      feedback.innerHTML = `<div class="font-bold"><i class="fa-solid fa-circle-check mr-1.5"></i> Validation Passed!</div><p class="mt-1">This result file conforms to schema guidelines and is ready to be submitted in a Pull Request.</p>`;
+      feedback.className = 'feedback feedback--ok';
+      feedback.innerHTML = `<strong>Looks complete</strong>The required fields are present. CI will still check the values and the hardware telemetry.`;
       feedback.classList.remove('hidden');
     }
   } catch (err) {
-    feedback.className = 'p-3 rounded-lg text-xs bg-red-950/70 border border-red-800 text-red-300';
-    feedback.innerHTML = `<i class="fa-solid fa-bug mr-1.5"></i> Invalid JSON Syntax: ${err.message}`;
+    feedback.className = 'feedback feedback--error';
+    feedback.innerHTML = `<strong>Invalid JSON</strong>${err.message}`;
     feedback.classList.remove('hidden');
   }
 }
 
-// Update Table Header Sort Icons
+// Update table header sort markers
 function updateHeaderSortIcons() {
   const cols = ['rank', 'name', 'params', 'overall', 'gsm8k', 'humaneval', 'arc', 'ifeval', 'tool_calling'];
   cols.forEach(col => {
@@ -1386,9 +1366,11 @@ function updateHeaderSortIcons() {
     if (!icon) return;
 
     if (currentSort.column === col) {
-      icon.className = currentSort.direction === 'asc' ? 'fa-solid fa-sort-up text-cyan-400 text-xs' : 'fa-solid fa-sort-down text-cyan-400 text-xs';
+      icon.textContent = currentSort.direction === 'asc' ? '\u2191' : '\u2193';
+      icon.className = 'sort-mark is-active';
     } else {
-      icon.className = 'fa-solid fa-sort text-slate-600 text-[10px]';
+      icon.textContent = '\u00b7';
+      icon.className = 'sort-mark';
     }
   });
 }

@@ -1,806 +1,593 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Local AI Benchmark Leaderboard | Real-World Everyday Hardware Evaluations</title>
-  <meta name="description" content="Transparent, automated benchmarks for new AI models you can realistically run on consumer hardware, gaming GPUs, MacBooks, and everyday PCs.">
-  
-  <!-- Tailwind CSS via CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#ecfeff',
-              400: '#22d3ee',
-              500: '#06b6d4',
-              600: '#0891b2',
-              900: '#164e63'
-            }
-          }
-        }
-      }
-    }
-  </script>
-
-  <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
-  <!-- Custom Stylesheet -->
+  <title>Local AI Benchmark — open models on ordinary hardware</title>
+  <meta name="description" content="A leaderboard for open-weights models tested on consumer GPUs, Apple Silicon, and plain system RAM. Every score comes with the hardware it ran on.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
 </head>
-<body class="min-h-screen flex flex-col bg-[#090d16] text-slate-100 antialiased selection:bg-cyan-500 selection:text-black">
+<body>
+  <a class="sr-only" href="#ledger">Skip to the leaderboard</a>
 
-  <!-- Header / Navigation Bar -->
-  <header class="sticky top-0 z-40 glass-nav border-b border-slate-800/80">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <!-- Brand Logo -->
-      <div class="flex items-center space-x-3">
-        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-500 to-purple-500 p-0.5 shadow-lg shadow-cyan-500/20">
-          <div class="h-full w-full bg-[#090d16] rounded-[10px] flex items-center justify-center">
-            <i class="fa-solid fa-microchip text-cyan-400 text-lg"></i>
-          </div>
-        </div>
-        <div>
-          <div class="flex items-center space-x-2">
-            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
-              Local AI Benchmark Leaderboard
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800/50">
-                Everyday Hardware
-              </span>
-            </h1>
-          </div>
-          <p class="text-xs text-slate-400 hidden sm:block">Testing AI you can realistically run on hardware you already have</p>
-        </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="flex items-center space-x-2 sm:space-x-3">
-        <button id=\"nav-compare-btn\" class="hidden sm:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 bg-slate-800/70 hover:bg-slate-700 border border-slate-700 transition">
-          <i class="fa-solid fa-code-compare text-indigo-400"></i>
-          <span>Compare (<span id="compare-count">0</span>)</span>
-        </button>
-
-        <button id="open-pr-guide-btn" class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-900 bg-gradient-to-r from-cyan-400 to-emerald-400 hover:from-cyan-300 hover:to-emerald-300 shadow-md shadow-cyan-500/20 transition transform hover:-translate-y-0.5">
-          <i class="fa-solid fa-code-pull-request text-slate-950"></i>
-          <span>Submit Model / PR Guide</span>
-        </button>
-
-        <a href="https://github.com/SeanDolan0/llm-auto-benchmark" target="_blank" rel="noopener noreferrer" class="p-2 rounded-lg text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 transition" title="View on GitHub">
-          <i class="fa-brands fa-github text-base"></i>
-        </a>
-      </div>
+  <header class="masthead">
+    <div class="wrap masthead-inner">
+      <a class="wordmark" href="#top" aria-label="Local AI Benchmark home">
+        <span class="wordmark-mark" aria-hidden="true">L/A</span>
+        <span class="wordmark-text">
+          <strong>Local AI Benchmark</strong>
+          <em>open weights &middot; ordinary hardware</em>
+        </span>
+      </a>
+      <nav class="masthead-nav" aria-label="Main">
+        <a href="#ledger">Ledger</a>
+        <a href="#method">Method</a>
+        <button type="button" id="nav-compare-btn" class="link-btn hidden">Compare (<span id="compare-count">0</span>)</button>
+        <button type="button" id="open-pr-guide-btn" class="link-btn">Submit a result</button>
+        <a href="https://github.com/SeanDolan0/llm-auto-benchmark" target="_blank" rel="noopener noreferrer">GitHub&nbsp;&#8599;</a>
+      </nav>
     </div>
   </header>
 
-  <!-- Main Content -->
-  <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-    
-    <!-- Hero / Intro -->
-    <div class="mb-8">
-      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-950/70 border border-cyan-800/60 text-cyan-300 text-xs mb-3">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 live-indicator"></span>
-            <span>Consumer &bull; Gaming GPUs &bull; Apple Silicon &bull; Everyday Laptops</span>
-          </div>
-          <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight">
-            What AI Can You <span class="bg-gradient-to-r from-cyan-400 via-indigo-400 to-emerald-400 bg-clip-text text-transparent">Actually Run Locally?</span>
-          </h2>
-          <p class="mt-3 text-slate-300 max-w-3xl text-sm sm:text-base leading-relaxed">
-            Most AI leaderboards evaluate massive models that require multi-thousand dollar server clusters. Our mission is to benchmark new open-weights models specifically for <strong class="text-white">hardware that normal people already have</strong> — gaming laptops, consumer desktop GPUs (RTX 3060, 4060, 4070), Apple Silicon Macs, and system RAM using modern quantizations.
-          </p>
-        </div>
-
-        <div class="flex items-center gap-2 self-start md:self-auto text-xs text-slate-400 bg-slate-900/80 px-3 py-2 rounded-lg border border-slate-800">
-          <i class="fa-regular fa-clock text-cyan-400"></i>
-          <span>Last Aggregated: <strong id="last-updated-text" class="text-slate-200">Loading...</strong></span>
-        </div>
-      </div>
-
-      <!-- Common Local Hardware Guide Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 mt-6">
-        <div class="glass-panel p-4 rounded-xl border border-slate-800/80 bg-slate-900/40 hover:border-cyan-500/40 transition">
-          <div class="flex items-center space-x-3 mb-1.5">
-            <div class="w-8 h-8 rounded-lg bg-cyan-950/80 border border-cyan-800 flex items-center justify-center text-cyan-400 text-sm">
-              <i class="fa-solid fa-gamepad"></i>
-            </div>
-            <div class="font-bold text-white text-sm">Gaming GPUs (6GB – 16GB)</div>
-          </div>
-          <p class="text-xs text-slate-400 leading-relaxed">
-            NVIDIA RTX 3060, 4060, 4070, and AMD Radeon GPUs. Runs modern 4-bit and 8-bit GGUF/AWQ models at fast 30–90+ tokens/sec.
-          </p>
-        </div>
-
-        <div class="glass-panel p-4 rounded-xl border border-slate-800/80 bg-slate-900/40 hover:border-indigo-500/40 transition">
-          <div class="flex items-center space-x-3 mb-1.5">
-            <div class="w-8 h-8 rounded-lg bg-indigo-950/80 border border-indigo-800 flex items-center justify-center text-indigo-400 text-sm">
-              <i class="fa-brands fa-apple"></i>
-            </div>
-            <div class="font-bold text-white text-sm">Apple Silicon (M1/M2/M3/M4)</div>
-          </div>
-          <p class="text-xs text-slate-400 leading-relaxed">
-            MacBooks, Mac Minis, and Mac Studios with unified memory. Seamlessly fits 3B–14B+ models with zero fan noise and low power draw.
-          </p>
-        </div>
-
-        <div class="glass-panel p-4 rounded-xl border border-slate-800/80 bg-slate-900/40 hover:border-emerald-500/40 transition">
-          <div class="flex items-center space-x-3 mb-1.5">
-            <div class="w-8 h-8 rounded-lg bg-emerald-950/80 border border-emerald-800 flex items-center justify-center text-emerald-400 text-sm">
-              <i class="fa-solid fa-laptop"></i>
-            </div>
-            <div class="font-bold text-white text-sm">Everyday CPUs & System RAM</div>
-          </div>
-          <p class="text-xs text-slate-400 leading-relaxed">
-            Standard laptops and desktops with 16GB–32GB RAM. llama.cpp CPU inference allows running models locally even without a GPU.
-          </p>
-        </div>
-      </div>
-
-      <!-- Stat Cards -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-        <div class="glass-panel rounded-xl p-4 relative overflow-hidden">
-          <div class="text-slate-400 text-xs font-medium flex items-center justify-between">
-            <span>Models Benchmarked</span>
-            <i class="fa-solid fa-server text-cyan-400/60 text-sm"></i>
-          </div>
-          <div id="stat-model-count" class="text-2xl sm:text-3xl font-extrabold text-cyan-400 mt-2">--</div>
-          <div class="text-[11px] text-slate-500 mt-1">Everyday Local AI</div>
-        </div>
-
-        <div class="glass-panel rounded-xl p-4 relative overflow-hidden">
-          <div class="text-slate-400 text-xs font-medium flex items-center justify-between">
-            <span>Leader / Top Score</span>
-            <i class="fa-solid fa-trophy text-amber-400/70 text-sm"></i>
-          </div>
-          <div id="stat-top-score" class="text-2xl sm:text-3xl font-extrabold text-emerald-400 mt-2">--</div>
-          <div id="stat-top-model" class="text-[11px] text-slate-400 mt-1 truncate">Loading...</div>
-        </div>
-
-        <div class="glass-panel rounded-xl p-4 relative overflow-hidden">
-          <div class="text-slate-400 text-xs font-medium flex items-center justify-between">
-            <span>Top Coding (HumanEval)</span>
-            <i class="fa-solid fa-code text-indigo-400/70 text-sm"></i>
-          </div>
-          <div id="stat-top-coding" class="text-2xl sm:text-3xl font-extrabold text-indigo-400 mt-2">--</div>
-          <div id="stat-top-coding-model" class="text-[11px] text-slate-400 mt-1 truncate">pass@1 benchmark</div>
-        </div>
-
-        <div class="glass-panel rounded-xl p-4 relative overflow-hidden">
-          <div class="text-slate-400 text-xs font-medium flex items-center justify-between">
-            <span>Top Math (GSM8K)</span>
-            <i class="fa-solid fa-square-root-variable text-purple-400/70 text-sm"></i>
-          </div>
-          <div id="stat-top-math" class="text-2xl sm:text-3xl font-extrabold text-purple-400 mt-2">--</div>
-          <div id="stat-top-math-model" class="text-[11px] text-slate-400 mt-1 truncate">Strict accuracy</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Filters & Search Toolbar -->
-    <div class="glass-panel rounded-xl p-4 mb-6 shadow-lg">
-      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-slate-800">
-        
-        <!-- Search Input -->
-        <div class="relative flex-grow max-w-lg">
-          <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-sm"></i>
-          <input type="text" id="search-input" placeholder="Search by model name, architecture, license, backend, quant..." 
-            class="w-full bg-[#050811] border border-slate-700/80 rounded-lg pl-9 pr-9 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition">
-          <button id="clear-search-btn" class="hidden absolute right-3 top-2.5 text-slate-500 hover:text-slate-300">
-            <i class="fa-solid fa-xmark text-sm"></i>
-          </button>
-        </div>
-
-        <!-- Action / Export controls -->
-        <div class="flex items-center flex-wrap gap-2 text-xs">
-          <button id="export-csv-btn" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
-            <i class="fa-solid fa-file-csv text-emerald-400"></i>
-            <span>Export CSV</span>
-          </button>
-          <button id="export-json-btn" class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
-            <i class="fa-solid fa-file-code text-cyan-400"></i>
-            <span>Export JSON</span>
-          </button>
-          <button id="reset-filters-btn" class="inline-flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60 transition">
-            <i class="fa-solid fa-rotate-left"></i>
-            <span>Reset</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Filter Dropdowns Row -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
-        <!-- Parameter Tier Filter -->
-        <div>
-          <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            <i class="fa-solid fa-sliders text-cyan-400 mr-1"></i> Parameter Tier
-          </label>
-          <select id="tier-filter" class="w-full bg-[#050811] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
-            <option value="all">All Everyday Hardware Tiers</option>
-            <option value="< 3B">&lt; 3B — Lightweight (Runs on almost any laptop or PC)</option>
-            <option value="3B–7B">3B – 7B — Everyday Sweet Spot (Ideal for 8GB VRAM / 16GB RAM)</option>
-            <option value="7B–14B">7B – 14B — Mid-Range Powerhouse (Ideal for 12GB–16GB VRAM)</option>
-            <option value="14B–32B">14B – 32B — Enthusiast Local (16GB+ VRAM or Apple Silicon)</option>
-            <option value="32B+">32B+ — Heavy Local (Layer offloading or high unified RAM)</option>
-          </select>
-        </div>
-
-        <!-- License Filter -->
-        <div>
-          <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            <i class="fa-solid fa-scale-balanced text-indigo-400 mr-1"></i> Model License
-          </label>
-          <select id="license-filter" class="w-full bg-[#050811] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
-            <option value="all">All Licenses</option>
-            <!-- Injected dynamically by JS -->
-          </select>
-        </div>
-
-        <!-- Quantization Filter -->
-        <div>
-          <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            <i class="fa-solid fa-box-archive text-purple-400 mr-1"></i> Quantization
-          </label>
-          <select id="quant-filter" class="w-full bg-[#050811] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
-            <option value="all">All Quantizations</option>
-            <option value="BF16">BF16 / FP16 (Full Precision)</option>
-            <option value="GGUF">GGUF (Q4 / Q8)</option>
-            <option value="AWQ">AWQ (4-bit)</option>
-            <option value="NF4">BitsAndBytes NF4</option>
-          </select>
-        </div>
-
-        <!-- Sort By -->
-        <div>
-          <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            <i class="fa-solid fa-arrow-down-short-wide text-emerald-400 mr-1"></i> Sort By
-          </label>
-          <select id="sort-select" class="w-full bg-[#050811] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
-            <option value="overall_desc">Overall Score (Highest)</option>
-            <option value="gsm8k_desc">GSM8K Math (Highest)</option>
-            <option value="humaneval_desc">HumanEval Coding (Highest)</option>
-            <option value="arc_desc">ARC Reasoning (Highest)</option>
-            <option value="ifeval_desc">IFEval (Highest)</option>
-            <option value="tool_calling_desc">Tool Calling (Highest)</option>
-            <option value="params_asc">Parameters (Smallest First)</option>
-            <option value="params_desc">Parameters (Largest First)</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Active Filter Status Bar -->
-      <div class="mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400">
-        <span id="results-count-text">Showing 0 models</span>
-        <span class="text-slate-500 text-[11px] hidden sm:inline">Tip: Click on any column header to sort &bull; Click any row to inspect full telemetry</span>
-      </div>
-    </div>
-
-    <!-- Leaderboard Table Container -->
-    <div class="glass-panel rounded-xl overflow-hidden shadow-2xl mb-8 border border-slate-800">
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm" id="leaderboard-table">
-          <thead class="bg-[#050811] text-[11px] uppercase tracking-wider text-slate-400 font-semibold border-b border-slate-800">
-            <tr>
-              <th class="px-3 py-3.5 w-10 text-center">
-                <span class="sr-only">Compare</span>
-                <i class="fa-solid fa-check-double text-slate-500" title="Select for comparison"></i>
-              </th>
-              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition w-16" data-sort="rank">
-                <div class="flex items-center space-x-1">
-                  <span>Rank</span>
-                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-rank"></i>
-                </div>
-              </th>
-              <th class="px-4 py-3.5 cursor-pointer hover:text-white transition min-w-[220px]" data-sort="name">
-                <div class="flex items-center space-x-1">
-                  <span>Model Name</span>
-                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-name"></i>
-                </div>
-              </th>
-              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition" data-sort="params">
-                <div class="flex items-center space-x-1">
-                  <span>Params</span>
-                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-params"></i>
-                </div>
-              </th>
-              <th class="px-4 py-3.5 cursor-pointer hover:text-white transition text-right bg-cyan-950/20 border-x border-slate-800/50" data-sort="overall">
-                <div class="flex items-center justify-end space-x-1 text-cyan-300 font-bold">
-                  <span>Overall</span>
-                  <i class="fa-solid fa-sort-down text-cyan-400 text-xs" id="sort-icon-overall"></i>
-                </div>
-              </th>
-              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition text-right" data-sort="gsm8k">
-                <div class="flex items-center justify-end space-x-1" title="Grade School Math 8K">
-                  <span>GSM8K</span>
-                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-gsm8k"></i>
-                </div>
-              </th>
-              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition text-right" data-sort="humaneval">
-                <div class="flex items-center justify-end space-x-1" title="HumanEval Python pass@1">
-                  <span>HumanEval</span>
-                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-humaneval"></i>
-                </div>
-              </th>
-              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition text-right" data-sort="arc">
-                <div class="flex items-center justify-end space-x-1" title="AI2 Reasoning Challenge">
-                  <span>ARC</span>
-                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-arc"></i>
-                </div>
-              </th>
-              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition text-right" data-sort="ifeval">
-                <div class="flex items-center justify-end space-x-1" title="Instruction Following Evaluation">
-                  <span>IFEval</span>
-                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-ifeval"></i>
-                </div>
-              </th>
-              <th class="px-3 py-3.5 cursor-pointer hover:text-white transition text-right" data-sort="tool_calling">
-                <div class="flex items-center justify-end space-x-1" title="Multi-Turn Tool Calling Accuracy">
-                  <span>Tool Calling</span>
-                  <i class="fa-solid fa-sort text-slate-600 text-[10px]" id="sort-icon-tool_calling"></i>
-                </div>
-              </th>
-              <th class="px-3 py-3.5 text-center w-20">Inspect</th>
-            </tr>
-          </thead>
-          <tbody id="table-body" class="divide-y divide-slate-800/80 text-slate-200">
-            <!-- Dynamic rows rendered by app.js -->
-            <tr>
-              <td colspan="11" class="text-center py-12 text-slate-500">
-                <i class="fa-solid fa-spinner fa-spin text-2xl text-cyan-400 mb-2"></i>
-                <div>Loading benchmark data from static JSON...</div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Visualizations: Radar & Parameter Efficiency Charts -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
-      <!-- 5-Pillar Capability Radar Chart -->
-      <div class="glass-panel rounded-xl p-5 shadow-lg">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-sm font-bold text-white flex items-center space-x-2">
-            <i class="fa-solid fa-chart-radar text-cyan-400"></i>
-            <span>5-Pillar Capability Radar</span>
-          </h3>
-          <span class="text-[11px] text-slate-400">Comparing top 3 models</span>
-        </div>
-        <p class="text-xs text-slate-400 mb-4">Normalized benchmark performance across GSM8K, HumanEval, ARC, IFEval, and Tool Calling.</p>
-        <div class="h-72 flex items-center justify-center">
-          <canvas id="radarChart"></canvas>
-        </div>
-      </div>
-
-      <!-- Parameter Size vs Overall Score Chart -->
-      <div class="glass-panel rounded-xl p-5 shadow-lg">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-sm font-bold text-white flex items-center space-x-2">
-            <i class="fa-solid fa-chart-column text-indigo-400"></i>
-            <span>Parameter Efficiency & Score Distribution</span>
-          </h3>
-          <span class="text-[11px] text-slate-400">Score vs Model Size</span>
-        </div>
-        <p class="text-xs text-slate-400 mb-4">Overall Score comparison highlighting parameter-efficient compact models.</p>
-        <div class="h-72 flex items-center justify-center">
-          <canvas id="barChart"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <!-- Community Pull Request Guide Section / Banner -->
-    <div class="glass-panel rounded-2xl p-6 sm:p-8 border border-cyan-800/40 relative overflow-hidden mb-12 glow-cyan">
-      <div class="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
-        <i class="fa-solid fa-code-pull-request text-[240px] text-cyan-400"></i>
-      </div>
-      <div class="relative z-10 max-w-3xl">
-        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-950 text-cyan-300 border border-cyan-800/80 mb-3">
-          <i class="fa-solid fa-users text-cyan-400 mr-1.5"></i> Community Contributions Welcome
-        </span>
-        <h3 class="text-2xl font-extrabold text-white">Have a model you'd like to benchmark?</h3>
-        <p class="text-sm text-slate-300 mt-2 leading-relaxed">
-          Anyone can submit benchmark results directly via GitHub Pull Requests! Run our reproducible test harness, drop the resulting JSON file into <code class="bg-[#050811] px-1.5 py-0.5 rounded text-cyan-300 font-mono text-xs">/data/results/&lt;model_slug&gt;.json</code>, and open a PR. Our automated CI verifies telemetry and updates the static leaderboard upon merge.
+  <main id="top">
+    <!-- Hero -->
+    <section class="hero wrap">
+      <div>
+        <p class="kicker">Open weights &middot; consumer hardware &middot; measured locally</p>
+        <h1>What can your machine <em>actually</em> run?</h1>
+        <p class="lede">
+          Most leaderboards rank models nobody can fit on a desk. This one runs five tests against
+          open-weights models on gaming GPUs, Apple Silicon, and plain system RAM &mdash; then publishes
+          the hardware, the raw counts, and the speed next to the score.
         </p>
-        <div class="mt-5 flex flex-wrap gap-3">
-          <button id="cta-pr-guide-btn" class="px-4 py-2 rounded-lg text-xs sm:text-sm font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-emerald-400 hover:from-cyan-300 hover:to-emerald-300 transition shadow-lg shadow-cyan-500/20">
-            <i class="fa-solid fa-book-open mr-1.5"></i> Read Step-by-Step Submission Guide
-          </button>
-          <button id="cta-test-validator-btn" class="px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition">
-            <i class="fa-solid fa-vial-circle-check text-cyan-400 mr-1.5"></i> Test Your JSON Schema Locally
-          </button>
+        <div class="hero-actions">
+          <a href="#ledger" class="btn btn--primary">See the rankings</a>
+          <button type="button" id="cta-pr-guide-btn" class="btn">Run it &amp; submit yours</button>
+        </div>
+        <div class="hero-foot">
+          <span>6&ndash;32&nbsp;GB VRAM</span>
+          <span>CPU-only runs included</span>
+          <span>Every result is a pull request</span>
         </div>
       </div>
-    </div>
 
+      <aside class="method-card" id="method" aria-labelledby="method-title">
+        <div class="method-head">
+          <span id="method-title">What gets measured</span>
+          <span>Weight</span>
+        </div>
+        <div class="method-row">
+          <div class="method-name">Math<span>GSM8K &middot; strict answer match</span></div>
+          <div class="method-weight">25%</div>
+        </div>
+        <div class="method-row">
+          <div class="method-name">Code<span>HumanEval &middot; pass@1</span></div>
+          <div class="method-weight">25%</div>
+        </div>
+        <div class="method-row">
+          <div class="method-name">Reasoning<span>ARC Challenge &middot; accuracy</span></div>
+          <div class="method-weight">20%</div>
+        </div>
+        <div class="method-row">
+          <div class="method-name">Instruction<span>IFEval &middot; constraints met</span></div>
+          <div class="method-weight">15%</div>
+        </div>
+        <div class="method-row">
+          <div class="method-name">Tool use<span>multi-turn function calls</span></div>
+          <div class="method-weight">15%</div>
+        </div>
+        <p class="method-note">
+          Overall is the composite recorded by the harness. If a result file only carries per-test
+          scores, the site applies the weights above. Nothing is normalised across hardware.
+        </p>
+      </aside>
+    </section>
+
+    <!-- Headline numbers -->
+    <section class="stats wrap" aria-label="Leaderboard summary">
+      <div class="stat-cell">
+        <div class="stat-label">Models on the board</div>
+        <div class="stat-value" id="stat-model-count">--</div>
+        <div class="stat-sub">Open weights only</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Best overall</div>
+        <div class="stat-value stat-value--rust" id="stat-top-score">--</div>
+        <div class="stat-sub" id="stat-top-model">Loading&hellip;</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Best at code</div>
+        <div class="stat-value" id="stat-top-coding">--</div>
+        <div class="stat-sub" id="stat-top-coding-model">HumanEval pass@1</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Best at math</div>
+        <div class="stat-value" id="stat-top-math">--</div>
+        <div class="stat-sub" id="stat-top-math-model">GSM8K strict accuracy</div>
+      </div>
+    </section>
+
+    <!-- Ledger -->
+    <section class="section wrap" id="ledger">
+      <div class="section-rail">
+        <span class="rail-no">01</span>
+        <span class="rail-label">The ledger</span>
+      </div>
+      <div class="section-body">
+        <div class="section-head">
+          <h2 class="section-title">Every run, ranked</h2>
+          <p class="section-note">Click a row for the full run record &middot; <span id="last-updated-text">updated recently</span></p>
+        </div>
+
+        <div class="toolbar">
+          <div class="toolbar-top">
+            <div class="search">
+              <input type="text" id="search-input" placeholder="Model, architecture, license, backend&hellip;" aria-label="Search models">
+              <button type="button" id="clear-search-btn" class="search-clear hidden" aria-label="Clear search">&times;</button>
+            </div>
+            <div class="toolbar-actions">
+              <button type="button" id="export-csv-btn" class="btn btn--ghost">Export CSV</button>
+              <button type="button" id="export-json-btn" class="btn btn--ghost">Export JSON</button>
+              <button type="button" id="reset-filters-btn" class="btn btn--ghost">Reset</button>
+            </div>
+          </div>
+
+          <div class="filters">
+            <div class="field">
+              <label for="tier-filter">Size</label>
+              <select id="tier-filter">
+                <option value="all">All sizes</option>
+                <option value="&lt; 3B">&lt; 3B &mdash; any laptop</option>
+                <option value="3B–7B">3B &ndash; 7B &mdash; 8 GB VRAM / 16 GB RAM</option>
+                <option value="7B–14B">7B &ndash; 14B &mdash; 12&ndash;16 GB VRAM</option>
+                <option value="14B–32B">14B &ndash; 32B &mdash; enthusiast</option>
+                <option value="32B+">32B+ &mdash; offloading / big unified memory</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="license-filter">License</label>
+              <select id="license-filter">
+                <option value="all">All licenses</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="quant-filter">Precision</label>
+              <select id="quant-filter">
+                <option value="all">All precisions</option>
+                <option value="BF16">BF16 / FP16</option>
+                <option value="GGUF">GGUF (Q4 / Q8)</option>
+                <option value="AWQ">AWQ 4-bit</option>
+                <option value="NF4">bitsandbytes NF4</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="sort-select">Order</label>
+              <select id="sort-select">
+                <option value="overall_desc">Overall, high to low</option>
+                <option value="gsm8k_desc">Math, high to low</option>
+                <option value="humaneval_desc">Code, high to low</option>
+                <option value="arc_desc">ARC, high to low</option>
+                <option value="ifeval_desc">Instruction, high to low</option>
+                <option value="tool_calling_desc">Tool use, high to low</option>
+                <option value="params_asc">Size, small to large</option>
+                <option value="params_desc">Size, large to small</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="toolbar-foot">
+            <span id="results-count-text">Showing 0 models</span>
+            <span>Click a column header to re-sort</span>
+          </div>
+        </div>
+
+        <div class="table-frame">
+          <table class="ledger" id="leaderboard-table">
+            <thead>
+              <tr>
+                <th class="col-check" scope="col"><span class="sr-only">Select for comparison</span></th>
+                <th class="col-rank" scope="col" data-sort="rank">
+                  <span class="th-inner"><span class="th-main">#</span><span class="sort-mark" id="sort-icon-rank">&middot;</span></span>
+                </th>
+                <th class="col-model" scope="col" data-sort="name">
+                  <span class="th-inner"><span class="th-main">Model</span><span class="sort-mark" id="sort-icon-name">&middot;</span></span>
+                  <span class="th-sub">license &middot; precision</span>
+                </th>
+                <th class="col-params" scope="col" data-sort="params">
+                  <span class="th-inner"><span class="th-main">Size</span><span class="sort-mark" id="sort-icon-params">&middot;</span></span>
+                  <span class="th-sub">parameters</span>
+                </th>
+                <th class="col-overall" scope="col" data-sort="overall">
+                  <span class="th-inner"><span class="th-main">Overall</span><span class="sort-mark is-active" id="sort-icon-overall">&darr;</span></span>
+                  <span class="th-sub">weighted</span>
+                </th>
+                <th class="col-score" scope="col" data-sort="gsm8k">
+                  <span class="th-inner"><span class="th-main">Math</span><span class="sort-mark" id="sort-icon-gsm8k">&middot;</span></span>
+                  <span class="th-sub">GSM8K</span>
+                </th>
+                <th class="col-score" scope="col" data-sort="humaneval">
+                  <span class="th-inner"><span class="th-main">Code</span><span class="sort-mark" id="sort-icon-humaneval">&middot;</span></span>
+                  <span class="th-sub">HumanEval</span>
+                </th>
+                <th class="col-score" scope="col" data-sort="arc">
+                  <span class="th-inner"><span class="th-main">ARC</span><span class="sort-mark" id="sort-icon-arc">&middot;</span></span>
+                  <span class="th-sub">reasoning</span>
+                </th>
+                <th class="col-score" scope="col" data-sort="ifeval">
+                  <span class="th-inner"><span class="th-main">Format</span><span class="sort-mark" id="sort-icon-ifeval">&middot;</span></span>
+                  <span class="th-sub">IFEval</span>
+                </th>
+                <th class="col-score" scope="col" data-sort="tool_calling">
+                  <span class="th-inner"><span class="th-main">Tools</span><span class="sort-mark" id="sort-icon-tool_calling">&middot;</span></span>
+                  <span class="th-sub">multi-turn</span>
+                </th>
+                <th class="col-action" scope="col">Open</th>
+              </tr>
+            </thead>
+            <tbody id="table-body">
+              <tr>
+                <td colspan="11">
+                  <div class="empty-state">
+                    <strong>Reading the ledger&hellip;</strong>
+                    <span>Loading results from static JSON.</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Figures -->
+    <section class="section wrap" id="figures">
+      <div class="section-rail">
+        <span class="rail-no">02</span>
+        <span class="rail-label">Figures</span>
+      </div>
+      <div class="section-body">
+        <div class="section-head">
+          <h2 class="section-title">Shape of the field</h2>
+          <p class="section-note">Tick up to three rows to compare them</p>
+        </div>
+        <div class="figures">
+          <figure class="figure" style="margin:0">
+            <div class="figure-head">
+              <h3>Five axes, one model</h3>
+              <span class="fig-no">Fig. 01</span>
+            </div>
+            <figcaption class="figure-note">The top three models by overall score, unless specific rows are ticked.</figcaption>
+            <div class="figure-canvas">
+              <canvas id="radarChart" aria-label="Radar chart of benchmark scores"></canvas>
+            </div>
+          </figure>
+          <figure class="figure" style="margin:0">
+            <div class="figure-head">
+              <h3>Score against size</h3>
+              <span class="fig-no">Fig. 02</span>
+            </div>
+            <figcaption class="figure-note">Smaller models are on the left. Height is overall score, not capability per gigabyte.</figcaption>
+            <div class="figure-canvas">
+              <canvas id="barChart" aria-label="Bar chart of overall score by model size"></canvas>
+            </div>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contribute -->
+    <section class="section wrap" id="submit">
+      <div class="section-rail">
+        <span class="rail-no">03</span>
+        <span class="rail-label">Contribute</span>
+      </div>
+      <div class="section-body">
+        <div class="contribute">
+          <div>
+            <h2>Run it on your machine. Send the receipt.</h2>
+            <p class="lede">
+              The harness records your GPU, VRAM, CPU, RAM, OS, driver, and tokens per second beside
+              the scores. A result without hardware context is an opinion, not a measurement.
+            </p>
+            <div class="contribute-actions">
+              <button type="button" id="cta-pr-guide-btn-secondary" class="btn btn--primary">Read the submission guide</button>
+              <button type="button" id="cta-test-validator-btn" class="btn">Test a result JSON</button>
+            </div>
+          </div>
+
+          <div>
+            <ol class="steps">
+              <li class="step">
+                <span class="step-no">1</span>
+                <div>
+                  <strong>Install the harness</strong>
+                  <p>Python 3.10+. Install the extra for whichever backend you use.</p>
+                </div>
+              </li>
+              <li class="step">
+                <span class="step-no">2</span>
+                <div>
+                  <strong>Point it at a model</strong>
+                  <p>Native llama.cpp, vLLM, transformers, or any OpenAI-compatible server such as Ollama or LM Studio.</p>
+                </div>
+              </li>
+              <li class="step">
+                <span class="step-no">3</span>
+                <div>
+                  <strong>Open the pull request</strong>
+                  <p>The JSON lands in <code>website/data/results/</code>. CI checks the schema and the board republishes on merge.</p>
+                </div>
+              </li>
+            </ol>
+            <pre class="code" style="margin-top:14px"><span class="c"># Ollama, LM Studio, vLLM, LocalAI &mdash; anything OpenAI-compatible</span>
+slm-bench evaluate \
+  --model-id <span class="p">"qwen2.5-coder:7b"</span> \
+  --backend openai \
+  --endpoint-url <span class="p">"http://localhost:11434/v1"</span> \
+  --model-ram-gb 4.8 \
+  --notes <span class="p">"RTX 3060 12GB, 33 layers on GPU"</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
-  <!-- Floating Comparison Dock (Appears when >= 2 models selected) -->
-  <div id="compare-dock" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40 hidden">
-    <div class="glass-panel px-5 py-3 rounded-2xl shadow-2xl border border-indigo-500/50 flex items-center space-x-4 glow-indigo">
-      <div class="flex items-center space-x-2 text-xs">
-        <span class="h-2 w-2 rounded-full bg-indigo-400 live-indicator"></span>
-        <span class="font-semibold text-white"><span id="dock-count">0</span> models selected</span>
-      </div>
-      <button id="dock-compare-btn" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition shadow-md">
-        Compare Head-to-Head
-      </button>
-      <button id="dock-clear-btn" class="text-slate-400 hover:text-white text-xs">
-        Clear
-      </button>
-    </div>
-  </div>
-
-  <!-- Modal: Model Inspector / Full Telemetry Card -->
-  <div id="model-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
-    <div class="glass-panel rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl relative border border-slate-700">
-      
-      <!-- Modal Header -->
-      <div class="p-6 border-b border-slate-800 flex items-start justify-between">
-        <div>
-          <div class="flex items-center space-x-2 mb-1">
-            <span id="modal-rank-badge" class="px-2 py-0.5 rounded text-xs font-bold bg-cyan-900/60 text-cyan-300 border border-cyan-700/60">Rank #1</span>
-            <span id="modal-tier-badge" class="px-2 py-0.5 rounded text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">7B–14B</span>
-            <span id="modal-quant-badge" class="px-2 py-0.5 rounded text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">GGUF Q4_K_M</span>
-          </div>
-          <h3 id="modal-model-title" class="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
-            Model Name
-          </h3>
-          <div class="flex items-center space-x-3 mt-1 text-xs">
-            <a id="modal-hf-link" href="#" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:underline flex items-center space-x-1">
-              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-              <span>View on Hugging Face</span>
-            </a>
-            <span class="text-slate-600">&bull;</span>
-            <span id="modal-eval-id" class="text-slate-400 font-mono">eval-id</span>
-          </div>
-        </div>
-
-        <button id="modal-close-btn" class="text-slate-400 hover:text-white text-xl p-1 rounded-lg hover:bg-slate-800 transition">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-
-      <!-- Modal Tabs Navigation -->
-      <div class="flex border-b border-slate-800 px-6 text-xs font-semibold bg-[#050811]/60">
-        <button class="modal-tab-btn py-3 px-3 border-b-2 border-cyan-400 text-cyan-300" data-tab="tab-overview">
-          <i class="fa-solid fa-chart-pie mr-1.5"></i> Scores & Tasks
-        </button>
-        <button class="modal-tab-btn py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200" data-tab="tab-hardware">
-          <i class="fa-solid fa-microchip mr-1.5"></i> Hardware & Run Info
-        </button>
-        <button class="modal-tab-btn py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200" data-tab="tab-logs">
-          <i class="fa-solid fa-terminal mr-1.5"></i> Raw Execution Logs
-        </button>
-        <button class="modal-tab-btn py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200" data-tab="tab-json">
-          <i class="fa-solid fa-code mr-1.5"></i> Raw JSON Result
-        </button>
-      </div>
-
-      <!-- Modal Body (Scrollable) -->
-      <div class="p-6 overflow-y-auto space-y-6 flex-grow" id="modal-body">
-        
-        <!-- Tab 1: Scores & Tasks -->
-        <div id="tab-overview" class="modal-tab-content space-y-5">
-          <!-- Overall Summary Cards -->
-          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <div class="bg-[#050811] p-3 rounded-xl border border-slate-800">
-              <span class="text-slate-400 text-xs">Overall Score</span>
-              <div id="modal-score-overall" class="text-2xl font-extrabold text-cyan-400 mt-1">--</div>
-            </div>
-            <div class="bg-[#050811] p-3 rounded-xl border border-slate-800">
-              <span class="text-slate-400 text-xs">Parameters</span>
-              <div id="modal-param-count" class="text-2xl font-extrabold text-white mt-1">--</div>
-            </div>
-            <div class="bg-[#050811] p-3 rounded-xl border border-slate-800">
-              <span class="text-slate-400 text-xs">RAM Footprint</span>
-              <div id="modal-model-ram" class="text-2xl font-extrabold text-emerald-400 mt-1">--</div>
-            </div>
-            <div class="bg-[#050811] p-3 rounded-xl border border-slate-800">
-              <span class="text-slate-400 text-xs">Architecture</span>
-              <div id="modal-architecture" class="text-base font-bold text-slate-200 mt-2 truncate">--</div>
-            </div>
-            <div class="bg-[#050811] p-3 rounded-xl border border-slate-800">
-              <span class="text-slate-400 text-xs">License</span>
-              <div id="modal-license" class="text-base font-bold text-slate-200 mt-2 truncate">--</div>
-            </div>
-          </div>
-
-          <!-- Evaluation Notes Section (if available) -->
-          <div id="modal-notes-section" class="bg-indigo-950/20 border border-indigo-900/60 p-4 rounded-xl hidden space-y-1">
-            <h5 class="font-bold text-indigo-300 uppercase tracking-wider text-xs flex items-center">
-              <i class="fa-solid fa-note-sticky text-amber-400 mr-2"></i> Evaluation Notes & Runner Configuration
-            </h5>
-            <p id="modal-notes-text" class="text-xs text-slate-300 leading-relaxed font-sans"></p>
-          </div>
-
-          <!-- Benchmark Breakdown Progress Bars -->
-          <div>
-            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">Benchmark Performance Breakdown</h4>
-            <div class="space-y-3" id="modal-tasks-breakdown">
-              <!-- Injected by JavaScript -->
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab 2: Hardware & Run Info -->
-        <div id="tab-hardware" class="modal-tab-content hidden space-y-4">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 space-y-2">
-              <h5 class="font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center">
-                <i class="fa-solid fa-memory text-cyan-400 mr-2"></i> GPU & Acceleration
-              </h5>
-              <div><span class="text-slate-400">GPU Model:</span> <strong id="modal-hw-gpu" class="text-white">N/A</strong></div>
-              <div><span class="text-slate-400">GPU VRAM:</span> <strong id="modal-hw-vram" class="text-white">N/A</strong></div>
-              <div><span class="text-slate-400">Model RAM / VRAM:</span> <strong id="modal-hw-model-ram" class="text-emerald-400">N/A</strong></div>
-              <div><span class="text-slate-400">CUDA / Driver:</span> <strong id="modal-hw-cuda" class="text-white">N/A</strong></div>
-              <div><span class="text-slate-400">Inference Backend:</span> <strong id="modal-hw-backend" class="text-white">N/A</strong></div>
-            </div>
-
-            <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 space-y-2">
-              <h5 class="font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center">
-                <i class="fa-solid fa-server text-indigo-400 mr-2"></i> Host Environment
-              </h5>
-              <div><span class="text-slate-400">CPU:</span> <strong id="modal-hw-cpu" class="text-white">N/A</strong></div>
-              <div><span class="text-slate-400">CPU Cores:</span> <strong id="modal-hw-cores" class="text-white">N/A</strong></div>
-              <div><span class="text-slate-400">Host Total RAM:</span> <strong id="modal-hw-ram" class="text-white">N/A</strong></div>
-              <div><span class="text-slate-400">Operating System:</span> <strong id="modal-hw-os" class="text-white">N/A</strong></div>
-            </div>
-          </div>
-
-          <!-- Submitter Attribution -->
-          <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 text-xs">
-            <h5 class="font-bold text-slate-300 uppercase tracking-wider mb-2">Submission Details</h5>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div><span class="text-slate-400">Submitter:</span> <strong id="modal-sub-name" class="text-white block">Community</strong></div>
-              <div><span class="text-slate-400">GitHub:</span> <strong id="modal-sub-github" class="text-cyan-400 block font-mono">@user</strong></div>
-              <div><span class="text-slate-400">Evaluated On:</span> <strong id="modal-sub-timestamp" class="text-white block font-mono">--</strong></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab 3: Raw Logs -->
-        <div id="tab-logs" class="modal-tab-content hidden">
-          <div class="terminal-window">
-            <div class="terminal-header">
-              <span class="text-xs font-mono text-slate-400 flex items-center space-x-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block"></span>
-                <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
-                <span class="ml-2">evaluation.log</span>
-              </span>
-              <button id="copy-logs-btn" class="text-xs text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 transition">
-                <i class="fa-regular fa-copy mr-1"></i> Copy Logs
-              </button>
-            </div>
-            <pre id="modal-raw-logs" class="p-4 text-xs font-mono text-emerald-400/90 whitespace-pre-wrap max-h-80 overflow-y-auto leading-relaxed bg-[#03060c]">Loading logs...</pre>
-          </div>
-        </div>
-
-        <!-- Tab 4: Raw JSON Result -->
-        <div id="tab-json" class="modal-tab-content hidden">
-          <div class="terminal-window">
-            <div class="terminal-header">
-              <span class="text-xs font-mono text-slate-400 flex items-center space-x-2">
-                <i class="fa-solid fa-file-code text-cyan-400"></i>
-                <span id="modal-json-filename">result.json</span>
-              </span>
-              <div class="flex items-center space-x-2">
-                <button id="copy-json-btn" class="text-xs text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 transition">
-                  <i class="fa-regular fa-copy mr-1"></i> Copy JSON
-                </button>
-                <a id="download-json-btn" href="#" download class="text-xs text-cyan-400 hover:text-cyan-300 px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 transition">
-                  <i class="fa-solid fa-download mr-1"></i> Download
-                </a>
-              </div>
-            </div>
-            <pre id="modal-raw-json" class="p-4 text-xs font-mono text-cyan-200/90 whitespace-pre max-h-80 overflow-y-auto leading-relaxed bg-[#03060c]">Loading JSON...</pre>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="p-4 border-t border-slate-800 bg-[#050811] flex justify-end">
-        <button id="modal-footer-close" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 transition">
-          Close
-        </button>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- Modal: Compare Head-to-Head -->
-  <div id="compare-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
-    <div class="glass-panel rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl relative border border-slate-700">
-      <div class="p-6 border-b border-slate-800 flex items-center justify-between">
-        <div>
-          <h3 class="text-xl font-bold text-white flex items-center space-x-2">
-            <i class="fa-solid fa-code-compare text-indigo-400"></i>
-            <span>Head-to-Head Comparison</span>
-          </h3>
-          <p class="text-xs text-slate-400 mt-1">Comparing side-by-side performance metrics & specs</p>
-        </div>
-        <button id="compare-modal-close" class="text-slate-400 hover:text-white text-xl">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-      <div class="p-6 overflow-x-auto overflow-y-auto" id="compare-content">
-        <!-- Injected by JavaScript -->
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Pull Request Submission Guide & Local Validator -->
-  <div id="pr-guide-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
-    <div class="glass-panel rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl relative border border-cyan-800/60">
-      
-      <!-- PR Guide Header -->
-      <div class="p-6 border-b border-slate-800 flex items-center justify-between">
-        <div>
-          <span class="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Community Contribution Workflow</span>
-          <h3 class="text-2xl font-extrabold text-white flex items-center gap-2 mt-0.5">
-            <i class="fa-solid fa-code-pull-request text-cyan-400"></i>
-            <span>Submit a Model to the Leaderboard</span>
-          </h3>
-        </div>
-        <button id="pr-guide-close-btn" class="text-slate-400 hover:text-white text-xl">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-
-      <!-- Tabs inside PR Guide -->
-      <div class="flex border-b border-slate-800 px-6 text-xs font-semibold bg-[#050811]/60">
-        <button class="pr-tab-btn py-3 px-3 border-b-2 border-cyan-400 text-cyan-300" data-prtab="pr-tab-steps">
-          <i class="fa-solid fa-list-ol mr-1.5"></i> 4-Step Submission Guide
-        </button>
-        <button class="pr-tab-btn py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200" data-prtab="pr-tab-validator">
-          <i class="fa-solid fa-vial-circle-check mr-1.5"></i> Local JSON Validator
-        </button>
-        <button class="pr-tab-btn py-3 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200" data-prtab="pr-tab-template">
-          <i class="fa-solid fa-file-lines mr-1.5"></i> PR Template
-        </button>
-      </div>
-
-      <!-- PR Guide Content -->
-      <div class="p-6 overflow-y-auto space-y-6 flex-grow text-xs leading-relaxed">
-        
-        <!-- Tab: 4-Step Workflow -->
-        <div id="pr-tab-steps" class="pr-tab-content space-y-6">
-          
-          <!-- Step 1 -->
-          <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 space-y-2">
-            <div class="flex items-center space-x-2 text-cyan-400 font-bold text-sm">
-              <span class="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-700 flex items-center justify-center text-xs">1</span>
-              <span>Fork & Clone the Repository</span>
-            </div>
-            <p class="text-slate-400 pl-8">Fork the leaderboard repository to your personal GitHub account and clone it to your machine:</p>
-            <div class="pl-8">
-              <pre class="bg-black/60 p-3 rounded-lg border border-slate-800 font-mono text-cyan-300 text-xs flex justify-between items-center">
-<span>git clone https://github.com/&lt;your-username&gt;/llm-auto-benchmark.git
-cd llm-auto-benchmark</span>
-                <button onclick="navigator.clipboard.writeText('git clone https://github.com/<your-username>/llm-auto-benchmark.git\ncd llm-auto-benchmark')" class="text-slate-500 hover:text-white ml-2"><i class="fa-regular fa-copy"></i></button>
-              </pre>
-            </div>
-          </div>
-
-          <!-- Step 2 -->
-          <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 space-y-2">
-            <div class="flex items-center space-x-2 text-cyan-400 font-bold text-sm">
-              <span class="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-700 flex items-center justify-center text-xs">2</span>
-              <span>Run the Evaluation on Your Local Hardware</span>
-            </div>
-            <p class="text-slate-400 pl-8">Run the evaluation harness on your consumer GPU, Mac, or CPU. You can evaluate directly or connect to custom software via local OpenAI-compatible endpoints (Ollama, LM Studio, vLLM, etc.):</p>
-            <div class="pl-8 space-y-2">
-              <pre class="bg-black/60 p-3 rounded-lg border border-slate-800 font-mono text-cyan-300 text-xs flex justify-between items-center">
-<span># Example: evaluate via Ollama / LM Studio / custom local endpoint:
-slm-bench evaluate \
-  --model-id "qwen2.5:7b" \
-  --backend openai \
-  --endpoint-url "http://localhost:11434/v1" \
-  --model-ram-gb 4.5 \
-  --notes "Ran via Ollama on RTX 3060 12GB"</span>
-                <button onclick="navigator.clipboard.writeText('slm-bench evaluate --model-id &quot;qwen2.5:7b&quot; --backend openai --endpoint-url &quot;http://localhost:11434/v1&quot; --model-ram-gb 4.5 --notes &quot;Ran via Ollama on RTX 3060 12GB&quot;')" class="text-slate-500 hover:text-white ml-2"><i class="fa-regular fa-copy"></i></button>
-              </pre>
-            </div>
-          </div>
-
-          <!-- Step 3 -->
-          <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 space-y-2">
-            <div class="flex items-center space-x-2 text-cyan-400 font-bold text-sm">
-              <span class="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-700 flex items-center justify-center text-xs">3</span>
-              <span>Drop the Generated JSON into <code class="text-cyan-300 font-mono">website/data/results/</code></span>
-            </div>
-            <p class="text-slate-400 pl-8">The harness automatically generates a standard JSON file in <code class="text-slate-200 font-mono">website/data/results/</code>. Verify it contains your consumer GPU/CPU specs and execution tokens/sec.</p>
-          </div>
-
-          <!-- Step 4 -->
-          <div class="bg-[#050811] p-4 rounded-xl border border-slate-800 space-y-2">
-            <div class="flex items-center space-x-2 text-cyan-400 font-bold text-sm">
-              <span class="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-700 flex items-center justify-center text-xs">4</span>
-              <span>Commit, Push & Open Pull Request</span>
-            </div>
-            <p class="text-slate-400 pl-8">Create a feature branch, commit your result file, push to your fork, and submit a PR:</p>
-            <div class="pl-8">
-              <pre class="bg-black/60 p-3 rounded-lg border border-slate-800 font-mono text-cyan-300 text-xs flex justify-between items-center">
-<span>git checkout -b submit/qwen-2.5-7b
-git add website/data/results/Qwen_Qwen2.5-7B-Instruct-GGUF_Q4_K_M.json
-git commit -m "feat(benchmark): add Qwen2.5-7B-Instruct evaluation"
-git push origin submit/qwen-2.5-7b</span>
-                <button onclick="navigator.clipboard.writeText('git checkout -b submit/qwen-2.5-7b\ngit add website/data/results/Qwen_Qwen2.5-7B-Instruct-GGUF_Q4_K_M.json\ngit commit -m &quot;feat(benchmark): add Qwen2.5-7B-Instruct evaluation&quot;\ngit push origin submit/qwen-2.5-7b')" class="text-slate-500 hover:text-white ml-2"><i class="fa-regular fa-copy"></i></button>
-              </pre>
-              <p class="mt-2 text-slate-400">Our GitHub Actions CI will automatically validate your submission against schema rules, verify common local hardware telemetry, and re-aggregate the leaderboard on merge!</p>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Tab: In-Browser Validator -->
-        <div id="pr-tab-validator" class="pr-tab-content hidden space-y-4">
-          <p class="text-slate-300">Paste your generated benchmark JSON below to test compliance before submitting your pull request:</p>
-          <div class="relative">
-            <textarea id="validator-input" rows="8" placeholder='{"model": {"model_id": "...", "param_count_b": 7.0}, "summary_scores": {...}}' class="w-full bg-[#050811] border border-slate-700 rounded-lg p-3 font-mono text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-cyan-500"></textarea>
-          </div>
-          <div class="flex items-center space-x-3">
-            <button id="validate-btn" class="px-4 py-2 rounded-lg text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 transition">
-              <i class="fa-solid fa-check-double mr-1.5"></i> Validate Submission JSON
-            </button>
-            <button id="load-sample-btn" class="px-3 py-2 rounded-lg text-xs text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition">
-              Load Sample Template
-            </button>
-          </div>
-          <div id="validator-feedback" class="hidden p-3 rounded-lg text-xs"></div>
-        </div>
-
-        <!-- Tab: PR Template -->
-        <div id="pr-tab-template" class="pr-tab-content hidden space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-slate-400">Copy this markdown template into your GitHub Pull Request description:</span>
-            <button id="copy-pr-template-btn" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-cyan-300 border border-slate-700 transition">
-              <i class="fa-regular fa-copy mr-1"></i> Copy Template
-            </button>
-          </div>
-          <pre id="pr-template-preview" class="bg-[#050811] p-4 rounded-xl border border-slate-800 font-mono text-slate-300 text-xs whitespace-pre-wrap max-h-80 overflow-y-auto leading-relaxed">Loading template...</pre>
-        </div>
-
-      </div>
-
-      <div class="p-4 border-t border-slate-800 bg-[#050811] flex justify-end">
-        <button id="pr-guide-close-bottom" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 transition">
-          Close
-        </button>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <footer class="border-t border-slate-800/80 bg-[#050811]/70 py-8 text-xs text-slate-500 mt-auto">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div class="flex items-center space-x-2">
-        <i class="fa-solid fa-microchip text-cyan-400"></i>
-        <span>AI Model Benchmark Leaderboard &bull; 100% Client-Side Static Architecture</span>
-      </div>
-      <div class="flex items-center space-x-4">
-        <a href="https://huggingface.co" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition flex items-center space-x-1">
-          <span>Hugging Face Hub</span>
-        </a>
-        <a href="PR_TEMPLATE.md" target="_blank" class="hover:text-slate-300 transition">PR Template</a>
-        <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="hover:text-slate-300 transition flex items-center space-x-1">
-          <i class="fa-brands fa-github"></i>
-          <span>GitHub</span>
-        </a>
+  <footer class="site-foot">
+    <div class="wrap">
+      <span>Local AI Benchmark &middot; static site, no server &middot; MIT-licensed harness</span>
+      <div class="foot-links">
+        <a href="https://github.com/SeanDolan0/llm-auto-benchmark" target="_blank" rel="noopener noreferrer">Repository</a>
+        <a href="https://github.com/SeanDolan0/llm-auto-benchmark/blob/main/README.md" target="_blank" rel="noopener noreferrer">Method</a>
+        <a href="PR_TEMPLATE.md" target="_blank" rel="noopener noreferrer">PR template</a>
+        <a href="https://huggingface.co" target="_blank" rel="noopener noreferrer">Hugging Face</a>
       </div>
     </div>
   </footer>
 
-  <!-- Main JavaScript App -->
+  <!-- Comparison dock -->
+  <div id="compare-dock" class="dock hidden">
+    <div class="dock-panel">
+      <span><strong id="dock-count">0</strong> selected</span>
+      <button type="button" id="dock-compare-btn" class="btn btn--primary btn--small">Compare</button>
+      <button type="button" id="dock-clear-btn" class="link-btn">Clear</button>
+    </div>
+  </div>
+
+  <!-- Model inspector -->
+  <div id="model-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-model-title">
+    <div class="modal-panel">
+      <div class="modal-head">
+        <div>
+          <span class="modal-kicker">Run record</span>
+          <h3 class="modal-title" id="modal-model-title">Model name</h3>
+          <div class="chip-row">
+            <span class="chip chip--rust" id="modal-rank-badge">Rank #--</span>
+            <span class="chip" id="modal-tier-badge">7B&ndash;14B</span>
+            <span class="chip" id="modal-quant-badge">GGUF Q4_K_M</span>
+          </div>
+          <div class="modal-sub">
+            <a id="modal-hf-link" href="#" target="_blank" rel="noopener noreferrer">Hugging Face card &#8599;</a>
+            &nbsp;&middot;&nbsp; <span id="modal-eval-id">ID: eval-id</span>
+          </div>
+        </div>
+        <button type="button" id="modal-close-btn" class="modal-close" aria-label="Close">&times;</button>
+      </div>
+
+      <div class="tabs">
+        <button type="button" class="tab modal-tab-btn is-active" data-tab="tab-overview">Scores</button>
+        <button type="button" class="tab modal-tab-btn" data-tab="tab-hardware">Hardware</button>
+        <button type="button" class="tab modal-tab-btn" data-tab="tab-logs">Logs</button>
+        <button type="button" class="tab modal-tab-btn" data-tab="tab-json">Raw JSON</button>
+      </div>
+
+      <div class="modal-body" id="modal-body">
+        <!-- Scores -->
+        <div id="tab-overview" class="modal-tab-content">
+          <div class="stat-grid">
+            <div class="stat-box">
+              <span class="stat-label">Overall</span>
+              <div class="stat-value" id="modal-score-overall">--</div>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">Parameters</span>
+              <div class="stat-value" id="modal-param-count">--</div>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">Model in memory</span>
+              <div class="stat-value" id="modal-model-ram">--</div>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">Architecture</span>
+              <div class="stat-value stat-value--small" id="modal-architecture">--</div>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">License</span>
+              <div class="stat-value stat-value--small" id="modal-license">--</div>
+            </div>
+          </div>
+
+          <div id="modal-notes-section" class="notes hidden">
+            <h5>Runner notes</h5>
+            <p id="modal-notes-text"></p>
+          </div>
+
+          <h4 class="subhead">Test breakdown</h4>
+          <div class="task-list" id="modal-tasks-breakdown"></div>
+        </div>
+
+        <!-- Hardware -->
+        <div id="tab-hardware" class="modal-tab-content hidden">
+          <div class="panel-grid">
+            <div class="panel">
+              <h5>GPU &amp; acceleration</h5>
+              <dl>
+                <div class="def"><dt>GPU</dt><dd id="modal-hw-gpu">N/A</dd></div>
+                <div class="def"><dt>VRAM</dt><dd id="modal-hw-vram">N/A</dd></div>
+                <div class="def"><dt>Model footprint</dt><dd id="modal-hw-model-ram">N/A</dd></div>
+                <div class="def"><dt>CUDA / driver</dt><dd id="modal-hw-cuda">N/A</dd></div>
+                <div class="def"><dt>Backend</dt><dd id="modal-hw-backend">N/A</dd></div>
+              </dl>
+            </div>
+            <div class="panel">
+              <h5>Host</h5>
+              <dl>
+                <div class="def"><dt>CPU</dt><dd id="modal-hw-cpu">N/A</dd></div>
+                <div class="def"><dt>Cores</dt><dd id="modal-hw-cores">N/A</dd></div>
+                <div class="def"><dt>System RAM</dt><dd id="modal-hw-ram">N/A</dd></div>
+                <div class="def"><dt>Operating system</dt><dd id="modal-hw-os">N/A</dd></div>
+              </dl>
+            </div>
+          </div>
+
+          <h4 class="subhead">Submission</h4>
+          <div class="panel">
+            <dl>
+              <div class="def"><dt>Submitted by</dt><dd id="modal-sub-name">Community</dd></div>
+              <div class="def"><dt>GitHub</dt><dd id="modal-sub-github">@community</dd></div>
+              <div class="def"><dt>Evaluated</dt><dd id="modal-sub-timestamp">--</dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <!-- Logs -->
+        <div id="tab-logs" class="modal-tab-content hidden">
+          <div class="terminal">
+            <div class="terminal-head">
+              <span>evaluation.log</span>
+              <button type="button" id="copy-logs-btn" class="btn--term">Copy logs</button>
+            </div>
+            <pre id="modal-raw-logs">Loading logs&hellip;</pre>
+          </div>
+        </div>
+
+        <!-- JSON -->
+        <div id="tab-json" class="modal-tab-content hidden">
+          <div class="terminal">
+            <div class="terminal-head">
+              <span id="modal-json-filename">result.json</span>
+              <span>
+                <button type="button" id="copy-json-btn" class="btn--term">Copy</button>
+                <a id="download-json-btn" href="#" download class="btn--term" style="text-decoration:none;margin-left:6px">Download</a>
+              </span>
+            </div>
+            <pre id="modal-raw-json">Loading JSON&hellip;</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" id="modal-footer-close" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Head-to-head -->
+  <div id="compare-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="compare-title">
+    <div class="modal-panel modal-panel--wide">
+      <div class="modal-head">
+        <div>
+          <span class="modal-kicker">Side by side</span>
+          <h3 class="modal-title" id="compare-title">Head to head</h3>
+          <p class="modal-sub">Scores, memory footprint, and the machine each model ran on.</p>
+        </div>
+        <button type="button" id="compare-modal-close" class="modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body" id="compare-content"></div>
+    </div>
+  </div>
+
+  <!-- Submission guide -->
+  <div id="pr-guide-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="pr-guide-title">
+    <div class="modal-panel">
+      <div class="modal-head">
+        <div>
+          <span class="modal-kicker">Contribution workflow</span>
+          <h3 class="modal-title" id="pr-guide-title">Submit a model</h3>
+          <p class="modal-sub">One result file, one pull request. No account on this site.</p>
+        </div>
+        <button type="button" id="pr-guide-close-btn" class="modal-close" aria-label="Close">&times;</button>
+      </div>
+
+      <div class="tabs">
+        <button type="button" class="tab pr-tab-btn is-active" data-prtab="pr-tab-steps">Steps</button>
+        <button type="button" class="tab pr-tab-btn" data-prtab="pr-tab-validator">Check JSON</button>
+        <button type="button" class="tab pr-tab-btn" data-prtab="pr-tab-template">PR template</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Steps -->
+        <div id="pr-tab-steps" class="pr-tab-content">
+          <div class="pr-step">
+            <div class="pr-step-head"><span class="pr-step-no">1</span><strong>Fork and clone</strong></div>
+            <p>Fork the repository to your account, then clone your fork.</p>
+            <div class="code-row">
+              <pre>git clone https://github.com/&lt;your-username&gt;/llm-auto-benchmark.git
+cd llm-auto-benchmark</pre>
+              <button type="button" class="code-copy" onclick="navigator.clipboard.writeText('git clone https://github.com/&lt;your-username&gt;/llm-auto-benchmark.git\ncd llm-auto-benchmark')">Copy</button>
+            </div>
+          </div>
+
+          <div class="pr-step">
+            <div class="pr-step-head"><span class="pr-step-no">2</span><strong>Run the evaluation</strong></div>
+            <p>Use the model where it actually lives: llama.cpp, vLLM, transformers, or a local OpenAI-compatible server. Record the footprint.</p>
+            <div class="code-row">
+              <pre>slm-bench evaluate \
+  --model-id "qwen2.5:7b" \
+  --backend openai \
+  --endpoint-url "http://localhost:11434/v1" \
+  --model-ram-gb 4.8 \
+  --notes "Ollama on RTX 3060 12GB"</pre>
+              <button type="button" class="code-copy" onclick="navigator.clipboard.writeText('slm-bench evaluate --model-id &quot;qwen2.5:7b&quot; --backend openai --endpoint-url &quot;http://localhost:11434/v1&quot; --model-ram-gb 4.8 --notes &quot;Ollama on RTX 3060 12GB&quot;')">Copy</button>
+            </div>
+          </div>
+
+          <div class="pr-step">
+            <div class="pr-step-head"><span class="pr-step-no">3</span><strong>Keep the result file</strong></div>
+            <p>The harness writes to <code>website/data/results/&lt;model-slug&gt;.json</code>. Check that the GPU, VRAM, CPU, RAM, OS, and tokens/sec are present. Incomplete telemetry gets sent back.</p>
+          </div>
+
+          <div class="pr-step">
+            <div class="pr-step-head"><span class="pr-step-no">4</span><strong>Commit and open the PR</strong></div>
+            <p>Branch, commit, push, and open a pull request. CI validates the schema; a merge republishes the static board.</p>
+            <div class="code-row">
+              <pre>git checkout -b submit/qwen-2.5-7b
+git add website/data/results/Qwen_Qwen2.5-7B-Instruct-GGUF_Q4_K_M.json
+git commit -m "feat(benchmark): add Qwen2.5-7B-Instruct evaluation"
+git push origin submit/qwen-2.5-7b</pre>
+              <button type="button" class="code-copy" onclick="navigator.clipboard.writeText('git checkout -b submit/qwen-2.5-7b\ngit add website/data/results/Qwen_Qwen2.5-7B-Instruct-GGUF_Q4_K_M.json\ngit commit -m &quot;feat(benchmark): add Qwen2.5-7B-Instruct evaluation&quot;\ngit push origin submit/qwen-2.5-7b')">Copy</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Validator -->
+        <div id="pr-tab-validator" class="pr-tab-content hidden">
+          <p class="figure-note">Paste a generated result file to check the required fields before opening the PR.</p>
+          <textarea id="validator-input" class="validator-input" placeholder='{"model": {"model_id": "...", "param_count_b": 7.0}, "summary_scores": {...}}'></textarea>
+          <div class="validator-actions">
+            <button type="button" id="validate-btn" class="btn btn--primary">Check fields</button>
+            <button type="button" id="load-sample-btn" class="btn">Load a sample</button>
+          </div>
+          <div id="validator-feedback" class="feedback hidden"></div>
+        </div>
+
+        <!-- Template -->
+        <div id="pr-tab-template" class="pr-tab-content hidden">
+          <div class="section-head" style="margin-bottom:8px">
+            <p class="figure-note" style="margin:0">Paste this into the pull request description.</p>
+            <button type="button" id="copy-pr-template-btn" class="btn btn--small">Copy template</button>
+          </div>
+          <pre id="pr-template-preview" class="pr-template">Loading template&hellip;</pre>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" id="pr-guide-close-bottom" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

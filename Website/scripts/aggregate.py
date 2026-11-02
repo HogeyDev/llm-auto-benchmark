@@ -181,6 +181,10 @@ def main():
         try:
             with open(f, "r", encoding="utf-8") as fp:
                 data = json.load(fp)
+            backend = str(data.get("model", {}).get("backend", "")).strip().lower()
+            if backend == "mock":
+                print(f"[SKIP] {os.path.basename(f)}: mock backend, not a real evaluation")
+                continue
             entry = normalize_model_entry(data, f)
             records.append(entry)
         except Exception as e:
