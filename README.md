@@ -14,10 +14,10 @@ a score without hardware context is not reproducible.
 
 Two things that meet at a JSON file:
 
-1. **`slm_bench/`** — a Python CLI that loads a model, runs five short tests, records the host
-   hardware, and writes a standardized result.
-2. **`Website/`** — a static leaderboard that reads those results, ranks them, and lets you inspect
-   every run. No server, no database, no build step.
+1. **`slm_bench/`** — an extensible evaluation harness, interactive Terminal User Interface (TUI),
+   and CLI for running standardized benchmark profiles, capturing real hardware telemetry, and generating reproducible results.
+2. **`Website/`** — a static, paper-and-ink leaderboard that reads those results, ranks models across
+   three distinct capability tracks, and lets you inspect every run. No server, no database, no build step.
 
 A result is not accepted by uploading it to a service. It is a pull request against
 `Website/data/results/`. CI checks the schema; a merge republishes the board.
@@ -64,10 +64,23 @@ Every metric computes **Wilson 95% confidence intervals** to distinguish genuine
 
 ### Quantization Tradeoff Analysis
 
-Compare capability retention and VRAM/RAM savings between model quantizations (e.g. BF16 vs Q4):
+Compare capability retention, degradation percentage, and VRAM/RAM savings between model quantizations (e.g. BF16 vs Q4):
 
 ```bash
 slm-bench compare-quantization --baseline results/Model-BF16.json --quantized results/Model-Q4.json
+```
+
+## Interactive Terminal Studio (TUI)
+
+You can launch a full interactive Textual terminal studio to configure models, test endpoint connectivity, stream LLM reasoning and responses live, monitor evaluation progress in real time, and submit verified results:
+
+```bash
+slm-bench tui
+```
+
+Optional defaults can be provided on launch:
+```bash
+slm-bench tui --model-id "Qwen/Qwen2.5-7B-Instruct" --backend openai --endpoint-url "http://localhost:11434/v1"
 ```
 
 ## What "runs locally" means here
@@ -90,11 +103,12 @@ belong on the board.
 git clone https://github.com/SeanDolan0/llm-auto-benchmark.git
 cd llm-auto-benchmark
 
-pip install -e .                 # CLI only
+pip install -e .                 # CLI and TUI studio
 pip install -e ".[llamacpp]"     # llama.cpp / GGUF inference
 pip install -e ".[transformers]" # HF weights, bitsandbytes 4-bit / 8-bit
 pip install -e ".[vllm]"         # vLLM with AWQ / GPTQ
-pip install -e ".[all]"          # everything except vLLM, plus pytest
+pip install -e ".[test]"         # pytest and test suite dependencies
+pip install -e ".[all]"          # everything except vLLM, plus test dependencies
 ```
 
 Python 3.10 or newer.
@@ -116,13 +130,14 @@ slm-bench evaluate \
   --sample-limit 2
 ```
 
-A real GGUF run with layer offloading:
+A real GGUF run with layer offloading using the `standard` profile:
 
 ```bash
 slm-bench evaluate \
   --model-id "Qwen/Qwen2.5-Coder-7B-Instruct" \
   --quantization "GGUF_Q4_K_M" \
   --backend llamacpp \
+  --profile standard \
   --model-ram-gb 4.8 \
   --notes "RTX 3060 12GB, 33 layers on GPU"
 ```
@@ -135,8 +150,26 @@ slm-bench evaluate \
   --model-id "qwen2.5-coder:7b" \
   --backend openai \
   --endpoint-url "http://localhost:11434/v1" \
+  --profile standard \
   --model-ram-gb 4.8 \
   --notes "Ollama on an M2 MacBook Air, 16GB"
+```
+
+For models supporting explicit reasoning effort (e.g. reasoning models with thinking modes), pass `--reasoning-effort`:
+
+```bash
+slm-bench evaluate \
+  --model-id "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B" \
+  --backend openai \
+  --endpoint-url "http://localhost:11434/v1" \
+  --profile standard \
+  --reasoning-effort medium
+```
+
+Batch evaluate multiple models listed in a text or JSON file:
+
+```bash
+slm-bench batch --batch-file models.txt --backend openai --profile quick
 ```
 
 Results are written to `Website/data/results/<model-slug>.json` when that directory exists,
@@ -152,9 +185,19 @@ slm-bench evaluate \
   --model-id "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B" \
   --quantization "GGUF_Q4_K_M" \
   --backend llamacpp \
+  --profile standard \
   --model-ram-gb 9.5 \
   --notes "Apple M3 Max, Metal, 96GB unified memory" \
   --submit \
+  --github-repo "SeanDolan0/llm-auto-benchmark" \
+  --token "$GITHUB_TOKEN"
+```
+
+Or submit an already completed evaluation JSON:
+
+```bash
+slm-bench submit \
+  --file "Website/data/results/DeepSeek_DeepSeek-R1-Distill-Qwen-14B-GGUF_Q4_K_M.json" \
   --github-repo "SeanDolan0/llm-auto-benchmark" \
   --token "$GITHUB_TOKEN"
 ```
@@ -191,21 +234,27 @@ and inspector still work.
 ```text
 .
 ├── .github/workflows/
-│   ├── ci.yml                    # pytest on every push and pull request
+│   ├── ci.yml                    # pytest matrix on every push and pull request
 │   ├── deploy-pages.yml          # aggregates results, deploys Website/ to Pages
 │   └── validate-submission.yml   # validates result schema and telemetry on PRs
 ├── slm_bench/
 │   ├── backends/                 # llama.cpp, vLLM, transformers, OpenAI-compatible, mock
-│   ├── benchmarks/               # reasoning, coding, instruction, tool-calling tasks
-│   ├── models/                   # hardware detection, HF metadata, Pydantic schema
+│   ├── benchmarks/               # benchmark suites (reasoning, coding, instruction, tools, context, safety)
+│   ├── execution/                # inference gateway and streaming runtime
+│   ├── metrics/                  # telemetry monitoring & Wilson confidence intervals
+│   ├── models/                   # hardware detection, RAM estimator, HF metadata, Pydantic schema
+│   ├── scoring/                  # composite scoring engine & quantization analysis
 │   ├── submission/               # branch + pull request automation
+│   ├── utils/                    # logging & helper utilities
 │   ├── website_template/         # optional scaffold for a new leaderboard
+│   ├── tui.py                    # interactive Textual studio application
 │   └── cli.py                    # `slm-bench`
-├── tests/                        # unit tests for the harness and submission flow
+├── tests/                        # unit tests for the harness, TUI, and submission flow
 ├── Website/
 │   ├── data/results/             # one JSON file per evaluation
 │   ├── data/leaderboard.json     # generated aggregate
 │   ├── scripts/aggregate.py      # results -> leaderboard
+│   ├── scripts/generate_sample_data.py
 │   ├── index.html                # the ledger
 │   ├── style.css                 # paper-and-ink stylesheet
 │   └── app.js                    # filtering, sorting, charts, inspector
