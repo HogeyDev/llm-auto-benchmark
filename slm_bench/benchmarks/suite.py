@@ -3,7 +3,7 @@ Benchmark suite orchestrator, score normalization, and composite SLM-Index calcu
 """
 
 import uuid
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any, Callable
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 
 from ..backends.base import BaseInferenceBackend
@@ -44,6 +44,11 @@ class BenchmarkSuite:
         selected_tasks: Optional[List[str]] = None,
         sample_limit: Optional[int] = None,
         notes: Optional[str] = None,
+        on_task_start: Optional[Any] = None,
+        on_sample: Optional[Any] = None,
+        on_task_complete: Optional[Any] = None,
+        show_progress: bool = True,
+        cancel_event: Optional[Any] = None,
     ) -> BenchmarkResult:
         """
         Execute evaluation suite and return standardized BenchmarkResult.
@@ -56,20 +61,41 @@ class BenchmarkSuite:
 
         task_metrics: Dict[str, TaskMetric] = {}
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TimeElapsedColumn(),
-            console=console,
-        ) as progress:
-            main_bar = progress.add_task("[cyan]Running Benchmarks...", total=len(active_tasks))
+        if show_progress:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TimeElapsedColumn(),
+                console=console,
+            ) as progress:
+                main_bar = progress.add_task("[cyan]Running Benchmarks...", total=len(active_tasks))
 
+                for cat_key, task in active_tasks.items():
+                    if cancel_event and cancel_event.is_set():
+                        raise InterruptedError("Benchmark cancelled by user.")
+                    if on_task_start:
+                        on_task_start(task.task_id, task.category)
+                    progress.update(main_bar, description=f"[cyan]Evaluating: {task.task_id} ({task.category})")
+                    metric = task.run(backend, sample_limit=sample_limit, on_sample=on_sample, cancel_event=cancel_event)
+                    if cancel_event and cancel_event.is_set():
+                        raise InterruptedError("Benchmark cancelled by user.")
+                    task_metrics[task.task_id] = metric
+                    if on_task_complete:
+                        on_task_complete(task.task_id, metric)
+                    progress.advance(main_bar)
+        else:
             for cat_key, task in active_tasks.items():
-                progress.update(main_bar, description=f"[cyan]Evaluating: {task.task_id} ({task.category})")
-                metric = task.run(backend, sample_limit=sample_limit)
+                if cancel_event and cancel_event.is_set():
+                    raise InterruptedError("Benchmark cancelled by user.")
+                if on_task_start:
+                    on_task_start(task.task_id, task.category)
+                metric = task.run(backend, sample_limit=sample_limit, on_sample=on_sample, cancel_event=cancel_event)
+                if cancel_event and cancel_event.is_set():
+                    raise InterruptedError("Benchmark cancelled by user.")
                 task_metrics[task.task_id] = metric
-                progress.advance(main_bar)
+                if on_task_complete:
+                    on_task_complete(task.task_id, metric)
 
         # Aggregate by category
         category_scores: Dict[str, CategoryScore] = {}

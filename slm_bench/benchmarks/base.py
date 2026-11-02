@@ -30,6 +30,8 @@ class BaseBenchmarkTask(ABC):
         self,
         backend: BaseInferenceBackend,
         sample_limit: Optional[int] = None,
+        on_sample: Optional[Any] = None,
+        cancel_event: Optional[Any] = None,
     ) -> TaskMetric:
         """Execute evaluation samples and return normalized TaskMetric."""
         pass

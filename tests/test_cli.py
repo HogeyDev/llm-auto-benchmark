@@ -87,3 +87,21 @@ def test_cli_batch(tmp_path):
     ])
     assert result.exit_code == 0
     assert "Batch run completed for 2 models" in result.output
+
+
+def test_cli_evaluate_with_reasoning_effort(tmp_path):
+    import json
+    out_dir = tmp_path / "results"
+    result = runner.invoke(app, [
+        "evaluate",
+        "--model-id", "test/reasoning-model-4B",
+        "--backend", "mock",
+        "--output-dir", str(out_dir),
+        "--sample-limit", "1",
+        "--reasoning-effort", "low",
+    ])
+    assert result.exit_code == 0
+    saved_files = list(out_dir.glob("*.json"))
+    assert len(saved_files) == 1
+    content = json.loads(saved_files[0].read_text(encoding="utf-8"))
+    assert content["model"]["reasoning_effort"] == "low"

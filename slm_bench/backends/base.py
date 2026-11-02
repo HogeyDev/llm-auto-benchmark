@@ -25,6 +25,16 @@ class BaseInferenceBackend(ABC):
         self.device = device
         self.extra_kwargs = kwargs
         self.is_loaded = False
+        self.on_stream_chunk = kwargs.get("on_stream_chunk")
+        self.on_generation_result = kwargs.get("on_generation_result")
+
+    def set_stream_callback(self, callback) -> None:
+        """Set a real-time token/chunk streaming callback."""
+        self.on_stream_chunk = callback
+
+    def set_generation_callback(self, callback) -> None:
+        """Set a post-generation result telemetry callback."""
+        self.on_generation_result = callback
 
     @abstractmethod
     def load(self) -> None:

@@ -33,6 +33,7 @@ class ModelMetadata(BaseModel):
     context_length: Optional[int] = Field(None, description="Maximum context window in tokens")
     license: Optional[str] = Field(None, description="Model license")
     backend: str = Field(..., description="Inference backend used for evaluation")
+    reasoning_effort: Optional[str] = Field(None, description="Reasoning effort level (e.g. low, medium, high)")
 
 
 class TaskMetric(BaseModel):
@@ -85,6 +86,7 @@ class BenchmarkResult(BaseModel):
             "tool_calling": round(self.categories.get("tool_calling", CategoryScore(category="tool_calling", weight=0.20, normalized_score=0.0, task_count=0)).normalized_score, 2),
             "gpu": self.hardware.gpu_name or "CPU",
             "model_ram_gb": self.hardware.model_ram_gb or self.model.model_ram_gb,
+            "reasoning_effort": self.model.reasoning_effort,
             "notes": self.notes,
             "timestamp": self.timestamp,
         }

@@ -50,6 +50,34 @@ def test_get_hardware_info():
     assert hw.total_ram_gb > 0
 
 
+def test_get_cpu_brand_name():
+    from slm_bench.models.hardware import get_cpu_brand_name
+    cpu = get_cpu_brand_name()
+    assert cpu is not None
+    assert len(cpu) > 0
+
+
+def test_generate_auto_system_notes():
+    from slm_bench.models.hardware import generate_auto_system_notes, HardwareInfo
+    hw = HardwareInfo(
+        os="Windows 11",
+        cpu="Intel Ultra 9",
+        cpu_cores=16,
+        total_ram_gb=32.0,
+        gpu_name="NVIDIA GeForce RTX 5070 Ti",
+        gpu_vram_gb=12.0,
+    )
+    # Auto-generated notes without user notes
+    notes = generate_auto_system_notes(hw, backend_name="vllm", server_runtime="vLLM in WSL2")
+    assert "vLLM in WSL2" in notes
+    assert "GeForce RTX 5070 Ti" in notes
+    assert "12GB VRAM" in notes
+
+    # Preserves user notes when provided
+    user_notes = generate_auto_system_notes(hw, backend_name="vllm", server_runtime="vLLM in WSL2", user_notes="Needs custom code execution.")
+    assert user_notes == "Needs custom code execution."
+
+
 def test_fetch_hf_model_metadata_fallback():
     # Test fallback heuristics when offline or with custom name
     meta = fetch_hf_model_metadata("local/test-model-7B", quantization="AWQ_4BIT", backend="vllm")

@@ -11,7 +11,7 @@ import typer
 from rich.table import Table
 from rich.panel import Panel
 
-from .models.hardware import get_hardware_info
+from .models.hardware import get_hardware_info, generate_auto_system_notes
 from .models.metadata import fetch_hf_model_metadata
 from .models.memory_detector import auto_detect_model_ram_gb
 from .models.schema import BenchmarkResult
@@ -84,13 +84,18 @@ def evaluate(
     dry_run: bool = typer.Option(False, "--dry-run", help="Dry-run mode: do not push Git commits or open real PRs"),
     allow_over_50b: bool = typer.Option(True, "--allow-over-50b", help="Deprecated flag maintained for backwards compatibility"),
     notes: Optional[str] = typer.Option(None, "--notes", help="Optional notes on runner configuration, offloading, or execution details"),
+    reasoning_effort: Optional[str] = typer.Option(None, "--reasoning-effort", "--effort", help="Reasoning effort level for reasoning models (e.g. low, medium, high)"),
 ):
     """Run benchmark evaluation suite on a single model and save standardized JSON."""
     setup_logger()
+    if isinstance(reasoning_effort, typer.models.OptionInfo):
+        reasoning_effort = None
     logger.info(f"Initiating evaluation for [bold green]{model_id}[/bold green] using [cyan]{backend}[/cyan] backend...")
 
     # 1. Hardware and Model Metadata
     meta = fetch_hf_model_metadata(model_id, quantization=quantization, backend=backend, model_ram_gb=model_ram_gb)
+    if reasoning_effort:
+        meta.reasoning_effort = reasoning_effort
     hw = get_hardware_info(model_ram_gb=meta.model_ram_gb)
 
     # 2. Model Telemetry Logging (Small Local AI)
@@ -98,8 +103,8 @@ def evaluate(
         logger.info(f"Model '{model_id}' evaluated at {meta.param_count_b:.1f}B parameters (class: Small Local AI).")
     if meta.model_ram_gb:
         logger.info(f"Model RAM / VRAM footprint: [bold cyan]{meta.model_ram_gb:.2f} GB[/bold cyan]")
-    if notes:
-        logger.info(f"Evaluation Notes: [italic]{notes}[/italic]")
+    if reasoning_effort:
+        logger.info(f"Reasoning Effort: [bold yellow]{reasoning_effort}[/bold yellow]")
 
     # 3. Instantiate Backend
     try:
@@ -110,7 +115,9 @@ def evaluate(
             endpoint_url=endpoint_url,
             api_key=api_key,
             model_ram_gb=meta.model_ram_gb,
+            reasoning_effort=reasoning_effort,
         )
+        engine.load()
     except Exception as e:
         logger.error(f"Failed to initialize backend '{backend}': {e}")
         raise typer.Exit(code=1)
@@ -129,6 +136,17 @@ def evaluate(
             meta.model_ram_gb = detected_ram
             hw.model_ram_gb = detected_ram
 
+    # Automatically synthesize system & hardware execution notes
+    final_notes = generate_auto_system_notes(
+        hw=hw,
+        backend_name=backend,
+        endpoint_url=endpoint_url,
+        server_runtime=getattr(engine, "server_runtime", None),
+        user_notes=notes,
+    )
+    if final_notes:
+        logger.info(f"System & Hardware Notes: [italic]{final_notes}[/italic]")
+
     # 5. Parse Selected Tasks
     task_list = [t.strip() for t in tasks.split(",")] if tasks else None
 
@@ -140,7 +158,7 @@ def evaluate(
         hardware_info=hw,
         selected_tasks=task_list,
         sample_limit=sample_limit,
-        notes=notes,
+        notes=final_notes,
     )
 
     # 6. Save JSON Output
@@ -208,9 +226,12 @@ def batch(
     github_repo: Optional[str] = typer.Option(None, "--github-repo", help="Target GitHub repository"),
     token: Optional[str] = typer.Option(None, "--token", envvar="GITHUB_TOKEN", help="GitHub Token"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Dry run"),
+    reasoning_effort: Optional[str] = typer.Option(None, "--reasoning-effort", "--effort", help="Reasoning effort level for reasoning models"),
 ):
     """Run evaluation in batch mode for multiple models from a file."""
     setup_logger()
+    if isinstance(reasoning_effort, typer.models.OptionInfo):
+        reasoning_effort = None
     if not batch_file.exists():
         logger.error(f"Batch file not found: {batch_file}")
         raise typer.BadParameter(f"File not found: {batch_file}")
@@ -243,6 +264,7 @@ def batch(
             dry_run=dry_run,
             allow_over_50b=True,
             notes=notes or "Batch evaluation",
+            reasoning_effort=reasoning_effort,
         )
         results.append(res)
 
@@ -296,8 +318,33 @@ def init_website(
     logger.info(f"Static website scaffolded successfully at [bold green]{target_dir}[/bold green]")
 
 
+@app.command()
+def tui(
+    model_id: str = typer.Option("XHToken/Spark-X2.6-4B-INT4", "--model-id", "-m", help="Default model repository ID"),
+    backend: str = typer.Option("openai", "--backend", "-b", help="Default inference backend"),
+    endpoint_url: str = typer.Option("http://127.0.0.1:8000/v1", "--endpoint-url", "--endpoint", help="Server endpoint URL"),
+    api_key: Optional[str] = typer.Option(None, "--api-key", envvar="OPENAI_API_KEY", help="API key"),
+    quantization: str = typer.Option("INT4", "--quantization", "-q", help="Quantization method"),
+    reasoning_effort: str = typer.Option("low", "--reasoning-effort", "--effort", help="Reasoning effort level"),
+):
+    """Launch the interactive Terminal User Interface (TUI) with real-time LLM output verification."""
+    from .tui import launch_tui
+    launch_tui(
+        default_model=model_id,
+        default_backend=backend,
+        default_endpoint=endpoint_url,
+        default_api_key=api_key,
+        default_quant=quantization,
+        default_effort=reasoning_effort,
+    )
+
+
 def main():
-    app()
+    if len(sys.argv) == 1:
+        from .tui import launch_tui
+        launch_tui()
+    else:
+        app()
 
 
 if __name__ == "__main__":

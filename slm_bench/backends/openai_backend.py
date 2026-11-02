@@ -29,6 +29,7 @@ class OpenAICompatibleBackend(BaseInferenceBackend):
         endpoint_url: str = "http://localhost:11434/v1",
         api_key: str = "EMPTY",
         timeout: float = 120.0,
+        reasoning_effort: Optional[str] = None,
         **kwargs,
     ):
         super().__init__(model_id=model_id, quantization=quantization, device=device, **kwargs)
@@ -37,10 +38,14 @@ class OpenAICompatibleBackend(BaseInferenceBackend):
         self.endpoint_url = base.rstrip("/")
         self.api_key = api_key or kwargs.get("token") or "EMPTY"
         self.timeout = float(timeout)
+        self.reasoning_effort = reasoning_effort or kwargs.get("reasoning_effort")
         self.model_ram_gb: Optional[float] = kwargs.get("model_ram_gb")
+        self.server_engine: Optional[str] = None
+        self.server_version: Optional[str] = None
+        self.server_runtime: Optional[str] = None
 
     def load(self) -> None:
-        """Verify endpoint connectivity and model availability if supported."""
+        """Verify endpoint connectivity, model availability, and runtime environment if supported."""
         logger.info(f"Connecting to OpenAI-compatible endpoint at: [cyan]{self.endpoint_url}[/cyan] for model '[bold green]{self.model_id}[/bold green]'...")
         # Optional ping to /models
         try:
@@ -53,12 +58,43 @@ class OpenAICompatibleBackend(BaseInferenceBackend):
                 if resp.status == 200:
                     data = json.loads(resp.read().decode("utf-8"))
                     models = [m.get("id") for m in data.get("data", []) if isinstance(m, dict) and "id" in m]
+                    for m in data.get("data", []):
+                        if isinstance(m, dict) and m.get("owned_by"):
+                            self.server_engine = m.get("owned_by")
+                            break
                     logger.info(f"Connected to endpoint successfully. Found {len(models)} model(s).")
         except Exception as e:
             logger.debug(f"Endpoint /models check note (endpoint might only serve completions directly): {e}")
 
+        # Optional probe to /version (e.g. vLLM /version endpoint)
+        try:
+            base_url = self.endpoint_url.rsplit("/v1", 1)[0]
+            req_ver = urllib.request.Request(
+                f"{base_url}/version",
+                headers=self._get_headers(),
+                method="GET",
+            )
+            with urllib.request.urlopen(req_ver, timeout=2) as resp:
+                if resp.status == 200:
+                    v_data = json.loads(resp.read().decode("utf-8"))
+                    if isinstance(v_data, dict) and "version" in v_data:
+                        self.server_version = v_data["version"]
+        except Exception:
+            pass
+
+        # Synthesize server runtime descriptor
+        from ..models.hardware import is_endpoint_wsl_relayed, is_wsl_environment
+        engine_str = self.server_engine or "OpenAI API"
+        if engine_str.lower() == "vllm":
+            engine_str = "vLLM"
+        if self.server_version:
+            engine_str = f"{engine_str} {self.server_version}"
+        if is_endpoint_wsl_relayed(self.endpoint_url) or is_wsl_environment():
+            engine_str = f"{engine_str} in WSL2"
+        self.server_runtime = engine_str
+
         self.is_loaded = True
-        logger.info(f"OpenAI-compatible backend loaded and ready for '{self.model_id}'.")
+        logger.info(f"OpenAI-compatible backend loaded ({self.server_runtime}) and ready for '{self.model_id}'.")
 
     def _get_headers(self) -> Dict[str, str]:
         headers = {
@@ -115,8 +151,50 @@ class OpenAICompatibleBackend(BaseInferenceBackend):
             "max_tokens": max_new_tokens,
             "temperature": max(0.0, temperature),
         }
+        if self.reasoning_effort:
+            payload["reasoning_effort"] = self.reasoning_effort
         if stop_sequences:
             payload["stop"] = stop_sequences
+
+        # 1. Real-time token streaming if callback is registered
+        if getattr(self, "on_stream_chunk", None):
+            stream_payload = dict(payload)
+            stream_payload["stream"] = True
+            url = f"{self.endpoint_url}/chat/completions"
+            data = json.dumps(stream_payload).encode("utf-8")
+            req = urllib.request.Request(url, data=data, headers=self._get_headers(), method="POST")
+            start_time = time.perf_counter()
+            collected_chunks: List[str] = []
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    for line in resp:
+                        line_str = line.decode("utf-8").strip()
+                        if not line_str or line_str.startswith(":"):
+                            continue
+                        if line_str == "data: [DONE]":
+                            break
+                        if line_str.startswith("data: "):
+                            chunk_json = line_str[6:]
+                            try:
+                                chunk_data = json.loads(chunk_json)
+                                choices = chunk_data.get("choices", [])
+                                if choices:
+                                    delta = choices[0].get("delta", {})
+                                    content = delta.get("content") or ""
+                                    if content:
+                                        collected_chunks.append(content)
+                                        self.on_stream_chunk(content)
+                            except Exception:
+                                pass
+                full_text = "".join(collected_chunks)
+                latency_ms = (time.perf_counter() - start_time) * 1000.0
+                tokens = max(1, len(full_text.split()))
+                res = GenerationResult(text=full_text, latency_ms=latency_ms, tokens_generated=tokens)
+                if getattr(self, "on_generation_result", None):
+                    self.on_generation_result({"text": full_text, "latency_ms": latency_ms, "tokens": tokens})
+                return res
+            except Exception as e:
+                logger.debug(f"Streaming probe note, falling back to synchronous execution: {e}")
 
         start_time = time.perf_counter()
         try:
@@ -156,6 +234,11 @@ class OpenAICompatibleBackend(BaseInferenceBackend):
         completion_tokens = usage.get("completion_tokens")
         if completion_tokens is None or completion_tokens == 0:
             completion_tokens = max(1, len(text.split()))
+
+        if getattr(self, "on_stream_chunk", None):
+            self.on_stream_chunk(text)
+        if getattr(self, "on_generation_result", None):
+            self.on_generation_result({"text": text, "latency_ms": latency_ms, "tokens": completion_tokens})
 
         return GenerationResult(
             text=text,

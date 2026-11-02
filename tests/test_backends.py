@@ -51,6 +51,31 @@ def test_openai_compatible_backend_initialization_and_mock(monkeypatch):
     assert gen_res.latency_ms >= 0
 
 
+def test_openai_compatible_backend_reasoning_effort(monkeypatch):
+    from slm_bench.backends.openai_backend import OpenAICompatibleBackend
+    backend = get_backend(
+        "openai",
+        model_id="qwen2.5:7b",
+        reasoning_effort="high",
+    )
+    assert isinstance(backend, OpenAICompatibleBackend)
+    assert backend.reasoning_effort == "high"
+
+    recorded_payload = {}
+
+    def mock_post(path, payload):
+        recorded_payload.update(payload)
+        return {
+            "id": "chatcmpl-456",
+            "choices": [{"message": {"role": "assistant", "content": "Thinking completed."}}],
+            "usage": {"completion_tokens": 5, "prompt_tokens": 5, "total_tokens": 10},
+        }
+
+    monkeypatch.setattr(backend, "_post", mock_post)
+    backend.chat([{"role": "user", "content": "Hello"}])
+    assert recorded_payload.get("reasoning_effort") == "high"
+
+
 def test_mock_backend_generation():
     backend = get_backend("mock", model_id="test/mock-model", quantization="BF16")
     assert isinstance(backend, MockInferenceBackend)
