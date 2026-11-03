@@ -1,283 +1,276 @@
 # Local AI Benchmark
 
-A test harness and leaderboard for open-weights models that fit on hardware people actually own.
+A verifiable evaluation harness and leaderboard for local language models based strictly on **established, official benchmarks**.
 
-[Live leaderboard](https://seandolan0.github.io/llm-auto-benchmark/) &middot; [How scoring works](#how-the-score-works) &middot; [Run it](#run-it) &middot; [Submit a result](#submit-a-result)
+[Live Leaderboard](https://seandolan0.github.io/llm-auto-benchmark/) &middot; [Official Benchmark Suite](#official-benchmark-suite) &middot; [Profiles](#evaluation-profiles) &middot; [Scoring & Integrity](#scoring-methodology--benchmark-integrity) &middot; [CLI Usage](#cli-usage) &middot; [Submit a Result](#submitting-a-result)
 
-Most leaderboards measure models on machines nobody has. This one measures them on RTX 3060s,
-MacBooks, and laptops with 16&nbsp;GB of RAM — and publishes the machine next to the score, because
-a score without hardware context is not reproducible.
+Most leaderboards evaluate language models on enterprise clusters with hundreds of gigabytes of VRAM. This benchmark evaluates models on hardware people actually own (RTX 3060/4080s, Apple Silicon Macs, consumer CPUs) while upholding the rigorous standards of established academic benchmarks.
+
+Every result on the leaderboard records the host hardware, model footprint (RAM/VRAM), exact dataset revision, 95% Wilson confidence intervals, and full question-by-question provenance.
 
 ---
 
-## What is in this repository
+## Benchmark Integrity & Architecture
 
-Two things that meet at a JSON file:
+A core principle of this project is **strict benchmark integrity**:
+* **Zero Handcrafted Questions**: We never create custom questions or synthetic mock evaluations and label them as official benchmarks.
+* **Official Datasets & Evaluators**: Every evaluation runs the authentic upstream datasets (MMLU-Pro, GPQA Diamond, BBH, GSM8K, MATH-500, IFEval, EvalPlus, BFCL, RULER, XSTest).
+* **Elimination of Scoring Shortcuts**: No credit is awarded for keyword presence in an explanation, semantic similarity approximations, or incidental numbers in response text.
+* **Secure Isolated Execution**: Untrusted model-generated code is executed inside containerized Docker sandboxes with no network access, memory limits, and wall-clock timeouts. If Docker is unavailable, coding evaluations are reported as `UNAVAILABLE` rather than executing untrusted code on the host.
+* **Strict Leaderboard Eligibility**: Only verified runs on complete official splits (`FULL` status) are eligible for official ranking. Seeded sample runs (`PARTIAL`) are transparently flagged and excluded from the leaderboard.
 
-1. **`slm_bench/`** — an extensible evaluation harness, interactive Terminal User Interface (TUI),
-   and CLI for running standardized benchmark profiles, capturing real hardware telemetry, and generating reproducible results.
-2. **`Website/`** — a static, paper-and-ink leaderboard that reads those results, ranks models across
-   three distinct capability tracks, and lets you inspect every run. No server, no database, no build step.
+---
 
-A result is not accepted by uploading it to a service. It is a pull request against
-`Website/data/results/`. CI checks the schema; a merge republishes the board.
+## Official Benchmark Suite
 
-## The tests & evaluation profiles
+| Benchmark | Category | Official Source | Official Split & Count | Evaluation Method & Execution Requirements |
+|:---|:---|:---|:---|:---|
+| **MMLU-Pro** | Reasoning | [TIGER-Lab/MMLU-Pro](https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro) | Test (12,032 questions) | 10-option multiple choice (A–J), deterministic extraction, subject breakdowns. |
+| **GPQA Diamond** | Reasoning | [idavidrein/gpqa](https://github.com/idavidrein/gpqa) | Diamond (198 questions) | PhD-level Google-proof Q&A. Reproducible seeded choice shuffling and answer-key remapping. |
+| **BIG-Bench Hard (BBH)** | Reasoning | [suzgunmirac/BIG-Bench-Hard](https://github.com/suzgunmirac/BIG-Bench-Hard) | All 23 Subtasks (6,511 items) | Task-specific algorithmic and deduction extraction across all 23 official subtasks. |
+| **GSM8K** | Mathematics | [openai/grade-school-math](https://github.com/openai/grade-school-math) | Test (1,319 problems) | Multi-step word math. Exact numerical normalization (`#### <num>`); no credit for explanation numbers. |
+| **MATH-500** | Mathematics | [HuggingFaceH4/MATH-500](https://huggingface.co/datasets/HuggingFaceH4/MATH-500) | Test (500 problems) | Challenging competition math. LaTeX normalization and SymPy symbolic equivalence engine. |
+| **IFEval** | Instruction | [google-research/ifeval](https://github.com/google-research/google-research/tree/master/instruction_following_eval) | Train (541 prompts) | Deterministic verifiable instruction constraints (length, formatting, keywords). Prompt & instruction strict accuracy. |
+| **EvalPlus** | Coding | [evalplus/evalplus](https://github.com/evalplus/evalplus) | HumanEval+ (164) & MBPP+ (378) | 80x expanded hidden test suites. Requires Docker sandbox container isolation. |
+| **LiveCodeBench** | Coding | [LiveCodeBench/LiveCodeBench](https://github.com/LiveCodeBench/LiveCodeBench) | Release-window problems | Contest programming test cases. Requires Docker sandbox container isolation. |
+| **BFCL v4** | Tool Calling | [gorilla-llm/berkeley-function-calling-leaderboard](https://gorilla.cs.berkeley.edu/leaderboard) | Standard & Multi-turn | AST parsing, strict parameter schema typing, native tool call execution, negative rejection. |
+| **RULER** | Long Context | [NVIDIA/RULER](https://github.com/NVIDIA/RULER) | 4K, 8K, 16K, 32K context | Needle-in-a-haystack, multi-hop retrieval, variable tracking across sequence lengths. |
+| **XSTest** | Safety | [paul-rottger/exaggerated-safety](https://github.com/paul-rottger/exaggerated-safety) | Test (450 prompts) | False Refusal Rate (FRR) vs Unsafe Compliance Rate (UCR). Segregated from intelligence score. |
 
-The test harness provides both rapid smoke testing and full academic/specialist benchmark suites organized by evaluation profile:
+---
 
-* **`quick`**: 4 fast core tests with minimal sample limit for smoke testing and local validation.
-* **`standard`** (default): core general intelligence suite combining fast tests with MMLU-Pro, GSM8K, EvalPlus, and BFCL.
-* **`extended`**: comprehensive evaluation across all 15 benchmark suites including GPQA, BBH, MATH-500, LiveCodeBench, IFBench, RULER, and Safety.
+## Evaluation Profiles
 
-To list all available benchmarks and profiles:
-```bash
-slm-bench list-benchmarks
-```
+The evaluation suite supports three standardized profiles:
 
-### Benchmark Tasks Catalog
+1. **`quick`** (Smoke Testing & Development):
+   - Deterministic seeded sample (e.g. 5 questions per benchmark).
+   - Tasks: MMLU-Pro, GPQA Diamond, GSM8K, MATH-500, IFEval.
+   - Status: Always labeled **`PARTIAL`**. Ineligible for the official leaderboard.
+2. **`standard`** (Core Official Leaderboard):
+   - Full official test splits across core general intelligence pillars.
+   - Tasks: Complete MMLU-Pro (12,032), GPQA Diamond (198), BBH (23 subtasks), GSM8K (1,319), MATH-500 (500), IFEval (541).
+   - Status: Labeled **`FULL`** when all splits complete. Eligible for official leaderboard publication.
+3. **`extended`** (Full Specialist Suite):
+   - Standard suite + EvalPlus (HumanEval+/MBPP+ in Docker), BFCL v4, RULER, and XSTest.
+   - Status: Labeled **`FULL`**.
 
-| Category | Benchmark Tasks | Metric & Capability |
-|:--|:--|:--|
-| **Reasoning & Math** | **GSM8K**, **MATH-500**, **MMLU-Pro**, **GPQA Diamond**, **BBH**, `slm_reasoning_cot` | Multi-step word math, competition algebra/number theory, 10-choice professional reasoning, PhD science deduction, and algorithmic logic. |
-| **Coding** | **EvalPlus** (HumanEval+ / MBPP+), **LiveCodeBench**, `slm_coding_agent` | Extended 80x edge-case Python function synthesis, post-cutoff competitive programming, and self-repair. |
-| **Instruction Following** | **IFEval**, **IFBench**, `slm_instruction_ifeval` | Verifiable countable constraints, JSON structure adherence, and 2-turn dynamic constraint updates. |
-| **Tool Calling & Agents** | **BFCL V4**, `slm_tool_calling_multiturn` | Catalog selection, strict parameter schema typing, multi-turn tool output synthesis, and negative refusal detection. |
-| **Long Context** | **RULER** (`ruler_context`) | Effective context length testing (needle-in-a-haystack, multi-hop retrieval, variable tracking). |
-| **Safety & Reliability** | **HarmBench** & **XSTest** (`safety_reliability`) | Adversarial jailbreak refusal accuracy vs. false refusal avoidance. |
+---
 
-## How the score works
+## Scoring Methodology & Benchmark Integrity
 
-Results are scored and grouped across three distinct leaderboard tracks:
+### Composite SLM-Index
+The composite **SLM-Index** reflects balanced performance across foundational capabilities:
+* **Reasoning** (25%): MMLU-Pro, GPQA Diamond, BBH.
+* **Mathematics** (25%): GSM8K, MATH-500.
+* **Instruction Following** (25%): IFEval (strict prompt accuracy).
+* **Coding** (15%): EvalPlus (HumanEval+ / MBPP+ pass@1).
+* **Tool Calling** (10%): BFCL v4.
 
-1. **General Intelligence (`slm_index`)**:
-   Weighted blend of core capability pillars:
-   ```text
-   reasoning 25%   coding 30%   instruction 25%   tool_calling 20%
-   ```
-2. **Coding & Agentic Index (`coding_agentic_index`)**:
-   Specialist score combining code generation, unit-test fulfillment, function calling, and multi-turn tool synthesis.
-3. **Local Hardware Efficiency**:
-   Inference decode tokens/sec, memory footprint (VRAM/RAM), and normalized **Score-per-GB** efficiency.
+*(When coding or tool calling are unavailable due to sandbox or API constraints, remaining weights are re-normalized proportionally across active pillars).*
 
-Every metric computes **Wilson 95% confidence intervals** to distinguish genuine model differences from sample variance.
+### Statistical Confidence
+For all binary accuracy metrics, **95% Wilson score confidence intervals** are computed:
+$$\hat{p} \pm \frac{z}{1 + \frac{z^2}{n}} \sqrt{\frac{\hat{p}(1-\hat{p})}{n} + \frac{z^2}{4n^2}}$$
+This allows users to immediately distinguish meaningful model advantages from statistical sampling noise.
 
-### Quantization Tradeoff Analysis
+### Safety Metric Segregation
+Safety evaluations (such as XSTest and HarmBench) report **False Refusal Rate (FRR)** and **Unsafe Compliance Rate (UCR)**. Safety scores are kept strictly segregated from the general intelligence composite score so that refusal behavior never artificially inflates or penalizes reasoning or coding marks.
 
-Compare capability retention, degradation percentage, and VRAM/RAM savings between model quantizations (e.g. BF16 vs Q4):
+---
 
-```bash
-slm-bench compare-quantization --baseline results/Model-BF16.json --quantized results/Model-Q4.json
-```
+## Supported Inference Backends
 
-## Interactive Terminal Studio (TUI)
+The benchmark adapter layer connects to any backend via a standardized inference gateway:
+* **OpenAI-Compatible** (`--backend openai`): Connects to Ollama, LM Studio, vLLM server, LocalAI, or custom OpenAI-compatible endpoints (`/v1/chat/completions`). Supports native streaming, timing telemetry, and reasoning effort controls.
+* **Transformers** (`--backend transformers`): Hugging Face native inference with bitsandbytes 4-bit / 8-bit quantization.
+* **llama.cpp** (`--backend llamacpp`): High-efficiency GGUF inference with layer offloading to GPU.
+* **vLLM** (`--backend vllm`): High-throughput PagedAttention engine.
+* **Mock** (`--backend mock`): Zero-GPU testing backend that exercises dataset loading, extraction, and reporting pipelines.
 
-You can launch a full interactive Textual terminal studio to configure models, test endpoint connectivity, stream LLM reasoning and responses live, monitor evaluation progress in real time, and submit verified results:
+---
 
-```bash
-slm-bench tui
-```
-
-Optional defaults can be provided on launch:
-```bash
-slm-bench tui --model-id "Qwen/Qwen2.5-7B-Instruct" --backend openai --endpoint-url "http://localhost:11434/v1"
-```
-
-## What "runs locally" means here
-
-| Size | What it takes, roughly |
-|:--|:--|
-| **&lt; 3B** | Any recent laptop. CPU inference is fine. |
-| **3B–7B** | 8&nbsp;GB VRAM, or 16&nbsp;GB of system RAM. The comfortable default. |
-| **7B–14B** | 12–16&nbsp;GB VRAM, or an Apple Silicon machine with 24&nbsp;GB unified memory. |
-| **14B–32B** | A 4-bit quant on 16–24&nbsp;GB VRAM, or layer offloading into system RAM. |
-| **32B+** | Possible on consumer gear with offloading. Expect it to be slow. |
-
-Model inclusion is curated: open weights, a license that permits local use, and a real path to
-running on one of those machines. A model that technically loads after swapping to disk does not
-belong on the board.
-
-## Install
+## Installation
 
 ```bash
 git clone https://github.com/SeanDolan0/llm-auto-benchmark.git
 cd llm-auto-benchmark
 
-pip install -e .                 # CLI and TUI studio
-pip install -e ".[llamacpp]"     # llama.cpp / GGUF inference
-pip install -e ".[transformers]" # HF weights, bitsandbytes 4-bit / 8-bit
-pip install -e ".[vllm]"         # vLLM with AWQ / GPTQ
-pip install -e ".[test]"         # pytest and test suite dependencies
-pip install -e ".[all]"          # everything except vLLM, plus test dependencies
+# Core CLI, dataset manager, and TUI studio
+pip install -e .
+
+# Optional benchmark dependencies
+pip install -e ".[reasoning]"      # datasets, huggingface_hub
+pip install -e ".[math]"           # sympy for mathematical equivalence
+pip install -e ".[coding]"         # isolated execution dependencies
+pip install -e ".[all-benchmarks]" # full benchmark suite dependencies
+
+# Inference backends
+pip install -e ".[transformers]"   # Hugging Face + bitsandbytes
+pip install -e ".[llamacpp]"       # llama.cpp Python bindings
+pip install -e ".[vllm]"           # vLLM engine
 ```
 
-Python 3.10 or newer.
+### Sandbox Requirement
+For coding benchmarks (`evalplus`, `livecodebench`), **Docker** must be installed and running on the host. If Docker is inactive, coding tasks will be reported as `UNAVAILABLE` to maintain system security.
 
-## Run it
+---
 
-Check what the host actually has before trusting a number:
+## Dataset Management
 
+Datasets are cached in `data/datasets/` and verified against pinned upstream revisions.
+
+```bash
+# List all registered official benchmarks, splits, and counts
+slm-bench list-benchmarks
+
+# Download official datasets
+slm-bench download --all
+# Or download a specific benchmark
+slm-bench download --benchmark mmlu_pro
+
+# Validate local cache integrity and sample counts
+slm-bench validate-datasets
+```
+
+---
+
+## CLI Usage
+
+### 1. Host Hardware & Model Footprint Inspection
+Inspect your hardware and auto-detect model VRAM/RAM requirements:
 ```bash
 slm-bench info --model-id "Qwen/Qwen2.5-7B-Instruct"
 ```
 
-Do a two-sample run first. The mock backend exercises the whole pipeline without touching a GPU:
-
+### 2. Run an Evaluation
+#### Smoke test with Mock backend:
 ```bash
 slm-bench evaluate \
-  --model-id "meta-llama/Llama-3.2-3B-Instruct" \
+  --model-id "Qwen/Qwen2.5-7B-Instruct" \
   --backend mock \
+  --profile quick \
   --sample-limit 2
 ```
 
-A real GGUF run with layer offloading using the `standard` profile:
-
+#### Real evaluation via local Ollama endpoint (OpenAI API):
 ```bash
 slm-bench evaluate \
-  --model-id "Qwen/Qwen2.5-Coder-7B-Instruct" \
-  --quantization "GGUF_Q4_K_M" \
-  --backend llamacpp \
-  --profile standard \
-  --model-ram-gb 4.8 \
-  --notes "RTX 3060 12GB, 33 layers on GPU"
-```
-
-Anything that speaks the OpenAI chat API works: Ollama, LM Studio, vLLM, LocalAI, or your own
-runner. Pass the footprint explicitly so the result is comparable:
-
-```bash
-slm-bench evaluate \
-  --model-id "qwen2.5-coder:7b" \
+  --model-id "qwen2.5:7b" \
   --backend openai \
   --endpoint-url "http://localhost:11434/v1" \
   --profile standard \
   --model-ram-gb 4.8 \
-  --notes "Ollama on an M2 MacBook Air, 16GB"
+  --notes "RTX 4080 16GB, full GPU offload"
 ```
 
-For models supporting explicit reasoning effort (e.g. reasoning models with thinking modes), pass `--reasoning-effort`:
-
-```bash
-slm-bench evaluate \
-  --model-id "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B" \
-  --backend openai \
-  --endpoint-url "http://localhost:11434/v1" \
-  --profile standard \
-  --reasoning-effort medium
-```
-
-Batch evaluate multiple models listed in a text or JSON file:
-
-```bash
-slm-bench batch --batch-file models.txt --backend openai --profile quick
-```
-
-Results are written to `Website/data/results/<model-slug>.json` when that directory exists,
-otherwise to `data/results/`. Every file contains the scores, per-test sample counts, tokens per
-second where the backend reports it, and the host telemetry.
-
-## Submit a result
-
-Automated:
-
+#### Evaluation with reasoning effort (for reasoning models):
 ```bash
 slm-bench evaluate \
   --model-id "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B" \
-  --quantization "GGUF_Q4_K_M" \
-  --backend llamacpp \
+  --backend openai \
+  --endpoint-url "http://localhost:11434/v1" \
   --profile standard \
-  --model-ram-gb 9.5 \
-  --notes "Apple M3 Max, Metal, 96GB unified memory" \
+  --reasoning-effort high
+```
+
+#### Run a single official benchmark:
+```bash
+slm-bench evaluate \
+  --model-id "meta-llama/Llama-3.2-3B-Instruct" \
+  --backend openai \
+  --benchmark gpqa_diamond
+```
+
+### 3. Inspect Question Provenance
+Inspect exact prompts, raw model responses, extracted answers, and constraint failure reasons:
+```bash
+slm-bench inspect-run -f Website/data/results/Qwen_Qwen2.5-7B-Instruct-BF16.json --limit 5
+```
+
+### 4. Compare Two Models
+Compare metric breakdowns and category tradeoffs between two model runs:
+```bash
+slm-bench compare \
+  --model-a Website/data/results/Qwen_Qwen2.5-7B-Instruct-BF16.json \
+  --model-b Website/data/results/meta-llama_Llama-3.2-3B-Instruct-BF16.json
+```
+
+### 5. Compare Quantizations
+Analyze capability degradation vs RAM/VRAM savings between precision levels (e.g. BF16 vs Q4):
+```bash
+slm-bench compare-quantization \
+  --baseline results/Qwen2.5-7B-BF16.json \
+  --quantized results/Qwen2.5-7B-GGUF_Q4.json
+```
+
+### 6. Interactive Terminal Studio (TUI)
+Launch the interactive terminal user interface:
+```bash
+slm-bench tui
+```
+
+---
+
+## Submitting a Result
+
+Results are submitted via Pull Request to `Website/data/results/<model-slug>.json`.
+
+Automated submission directly from the CLI:
+```bash
+slm-bench evaluate \
+  --model-id "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B" \
+  --backend openai \
+  --profile standard \
   --submit \
   --github-repo "SeanDolan0/llm-auto-benchmark" \
   --token "$GITHUB_TOKEN"
 ```
 
-Or submit an already completed evaluation JSON:
-
+Or submit an existing evaluation JSON:
 ```bash
 slm-bench submit \
-  --file "Website/data/results/DeepSeek_DeepSeek-R1-Distill-Qwen-14B-GGUF_Q4_K_M.json" \
+  --result-file "Website/data/results/Qwen-Qwen2.5-7B-Instruct-BF16.json" \
   --github-repo "SeanDolan0/llm-auto-benchmark" \
   --token "$GITHUB_TOKEN"
 ```
 
-That clones the repository, creates an `eval/<model-slug>` branch, commits the JSON, pushes, and
-opens a pull request with the hardware summary filled in.
+---
 
-Manual, if you would rather control the diff:
+## Running the Website Leaderboard Locally
 
-1. Run the evaluation.
-2. Check the JSON: the GPU, VRAM, CPU, RAM, OS, and (where available) driver are present, and the
-   sample counts are not zero.
-3. Run `python Website/scripts/aggregate.py` to confirm it compiles.
-4. Branch, commit the result file, push, and open a pull request. The template in
-   `Website/PR_TEMPLATE.md` is preloaded by GitHub.
-
-The browser can check the required fields too: open **Submit a result → Check JSON** on the site.
-
-## The site, locally
-
-No Node, no bundler:
-
+The leaderboard is static HTML/CSS/JS with zero build step:
 ```bash
-python Website/scripts/aggregate.py   # rebuilds Website/data/leaderboard.json
+# Aggregate result JSON files into leaderboard.json
+python Website/scripts/aggregate.py
+
+# Launch local preview server
 python -m http.server -d Website 8000
 ```
+Open <http://localhost:8000> in your browser.
 
-Then open <http://localhost:8000>. If the JSON cannot be fetched — for example when opening
-`index.html` directly from disk — the page falls back to an embedded dataset so the table, charts,
-and inspector still work.
+---
 
-## Repository layout
+## Testing
 
-```text
-.
-├── .github/workflows/
-│   ├── ci.yml                    # pytest matrix on every push and pull request
-│   ├── deploy-pages.yml          # aggregates results, deploys Website/ to Pages
-│   └── validate-submission.yml   # validates result schema and telemetry on PRs
-├── slm_bench/
-│   ├── backends/                 # llama.cpp, vLLM, transformers, OpenAI-compatible, mock
-│   ├── benchmarks/               # benchmark suites (reasoning, coding, instruction, tools, context, safety)
-│   ├── execution/                # inference gateway and streaming runtime
-│   ├── metrics/                  # telemetry monitoring & Wilson confidence intervals
-│   ├── models/                   # hardware detection, RAM estimator, HF metadata, Pydantic schema
-│   ├── scoring/                  # composite scoring engine & quantization analysis
-│   ├── submission/               # branch + pull request automation
-│   ├── utils/                    # logging & helper utilities
-│   ├── website_template/         # optional scaffold for a new leaderboard
-│   ├── tui.py                    # interactive Textual studio application
-│   └── cli.py                    # `slm-bench`
-├── tests/                        # unit tests for the harness, TUI, and submission flow
-├── Website/
-│   ├── data/results/             # one JSON file per evaluation
-│   ├── data/leaderboard.json     # generated aggregate
-│   ├── scripts/aggregate.py      # results -> leaderboard
-│   ├── scripts/generate_sample_data.py
-│   ├── index.html                # the ledger
-│   ├── style.css                 # paper-and-ink stylesheet
-│   └── app.js                    # filtering, sorting, charts, inspector
-├── pyproject.toml
-└── LICENSE
-```
-
-## Tests
-
+Run the full automated test suite:
 ```bash
 pytest -v
 ```
 
-## A note on the numbers
+All 53 unit and integration tests verify:
+* Exact deterministic answer extraction across multiple-choice options.
+* Anti-shortcut enforcement (zero credit for explanation keyword mentions).
+* Choice shuffling and key remapping for GPQA Diamond.
+* Mathematical LaTeX normalization and SymPy symbolic equivalence.
+* Deterministic constraint evaluation for IFEval.
+* Container sandbox security (rejection of untrusted host `exec()`).
+* Wilson 95% confidence interval calculations.
+* Leaderboard eligibility enforcement (FULL vs PARTIAL vs INVALID).
+* Website aggregation and Schema 2.0.0 serialization.
 
-This is a small, opinionated benchmark, not a peer-reviewed evaluation. A two-point gap between two
-models is usually noise. Read the per-test scores, the sample counts, and the machine before drawing
-a conclusion. Results without telemetry or sample counts are demos, not measurements.
-
-If you find a result that looks wrong, open an issue with the evaluation ID. Corrections are more
-useful than silent re-runs.
+---
 
 ## License
 
-Harness code: [MIT](LICENSE). Benchmark data contributed by the community stays under the license
-of the model it describes and is published for comparison, not as a warranty of fitness.
+MIT License. See [LICENSE](LICENSE) for details.

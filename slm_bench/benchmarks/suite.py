@@ -1,5 +1,7 @@
 """
-Benchmark suite orchestrator, score normalization, and composite SLM-Index calculation.
+Benchmark Suite Orchestrator, Provenance Tracking, and Multi-Track Aggregation.
+Executes official, verifiable benchmarks, records fine-grained question logs,
+and enforces strict leaderboard eligibility rules.
 """
 
 import uuid
@@ -10,60 +12,48 @@ from ..backends.base import BaseInferenceBackend
 from ..execution.inference_gateway import InferenceGateway
 from ..metrics.telemetry import PerformanceCollector
 from ..metrics.confidence import wilson_score_interval
-from ..scoring.scoring_engine import ScoringEngine, DEFAULT_CATEGORY_WEIGHTS
+from ..scoring.scoring_engine import ScoringEngine, DEFAULT_CATEGORY_WEIGHTS, EXTENDED_CATEGORY_WEIGHTS
 from ..models.schema import BenchmarkResult, TaskMetric, CategoryScore, ModelMetadata, HardwareInfo
 from .base import BaseBenchmarkTask
 from .registry import get_task, get_profile_tasks, BENCHMARK_REGISTRY
+from ..datasets.manager import BENCHMARK_DATASET_META
 from ..utils.logger import console, logger
 
 
 class BenchmarkSuite:
-    """Orchestrates multi-task SLM evaluation, telemetry, and composite index aggregation."""
+    """Orchestrates official benchmark evaluation, telemetry, and composite index aggregation."""
 
     def __init__(self, category_weights: Optional[Dict[str, float]] = None):
         self.weights = category_weights or DEFAULT_CATEGORY_WEIGHTS
         self.scoring_engine = ScoringEngine(category_weights=self.weights)
-        # Default core tasks for backwards compatibility
-        self.tasks: Dict[str, BaseBenchmarkTask] = {
-            "reasoning": get_task("slm_reasoning_cot"),
-            "coding": get_task("slm_coding_agent"),
-            "instruction": get_task("slm_instruction_ifeval"),
-            "tool_calling": get_task("slm_tool_calling_multiturn"),
-        }
 
     def resolve_tasks(
         self,
         selected_tasks: Optional[List[str]] = None,
-        profile: Optional[str] = None,
+        profile: Optional[str] = "standard",
     ) -> Dict[str, BaseBenchmarkTask]:
-        """Resolve active benchmark task instances based on profile or explicit task list."""
+        """Resolve active official benchmark task instances based on profile or explicit list."""
         if selected_tasks:
             resolved: Dict[str, BaseBenchmarkTask] = {}
             for name in selected_tasks:
                 clean_name = name.strip()
-                if clean_name in self.tasks:
-                    resolved[self.tasks[clean_name].task_id] = self.tasks[clean_name]
-                else:
-                    try:
-                        task_obj = get_task(clean_name)
-                        resolved[task_obj.task_id] = task_obj
-                    except ValueError:
-                        logger.warning(f"Skipping unrecognized task: '{clean_name}'")
-            return resolved
-
-        if profile:
-            profile_ids = get_profile_tasks(profile)
-            resolved = {}
-            for tid in profile_ids:
                 try:
-                    task_obj = get_task(tid)
+                    task_obj = get_task(clean_name)
                     resolved[task_obj.task_id] = task_obj
-                except Exception as e:
-                    logger.warning(f"Could not load task '{tid}' for profile '{profile}': {e}")
+                except ValueError:
+                    logger.warning(f"Skipping unrecognized official task: '{clean_name}'")
             return resolved
 
-        # Default fallback to 4 core tasks
-        return {t.task_id: t for t in self.tasks.values()}
+        profile_name = profile or "standard"
+        profile_ids = get_profile_tasks(profile_name)
+        resolved = {}
+        for tid in profile_ids:
+            try:
+                task_obj = get_task(tid)
+                resolved[task_obj.task_id] = task_obj
+            except Exception as e:
+                logger.warning(f"Could not load official task '{tid}' for profile '{profile_name}': {e}")
+        return resolved
 
     def run_suite(
         self,
@@ -79,12 +69,21 @@ class BenchmarkSuite:
         on_task_complete: Optional[Any] = None,
         show_progress: bool = True,
         cancel_event: Optional[Any] = None,
+        seed: int = 42,
     ) -> BenchmarkResult:
         """
-        Execute evaluation suite and return standardized BenchmarkResult with multi-track indices.
+        Execute evaluation suite and return standardized BenchmarkResult (Schema 2.0.0).
         """
-        logger.info(f"Starting evaluation suite for [bold green]{model_meta.model_id}[/bold green] (profile: {profile or 'custom'})...")
         active_tasks = self.resolve_tasks(selected_tasks=selected_tasks, profile=profile)
+
+        effective_sample_limit = sample_limit
+        if profile == "quick" and sample_limit is None:
+            effective_sample_limit = 5  # Deterministic quick profile smoke sample
+
+        logger.info(
+            f"Starting official evaluation suite for [bold green]{model_meta.model_id}[/bold green] "
+            f"(profile: {profile or 'custom'}, tasks: {len(active_tasks)})..."
+        )
 
         # Wrap backend in InferenceGateway with PerformanceCollector
         collector = PerformanceCollector()
@@ -107,9 +106,25 @@ class BenchmarkSuite:
                         raise InterruptedError("Benchmark cancelled by user.")
                     if on_task_start:
                         on_task_start(task.task_id, task.category)
-                    progress.update(main_bar, description=f"[cyan]Evaluating: {task.task_id} ({task.category})")
 
-                    metric = task.run(gateway.backend, sample_limit=sample_limit, on_sample=on_sample, cancel_event=cancel_event)
+                    # Log official benchmark provenance details
+                    meta = BENCHMARK_DATASET_META.get(task.task_id, {})
+                    ds_name = meta.get("name", task.task_id)
+                    ds_split = meta.get("split", "test")
+                    ds_rev = meta.get("revision", "official")
+                    q_count = effective_sample_limit or meta.get("expected_count", "Full")
+                    progress.update(
+                        main_bar,
+                        description=f"[cyan]Evaluating: {ds_name} ({ds_split}, {q_count} items)",
+                    )
+
+                    metric = task.run(
+                        gateway,
+                        sample_limit=effective_sample_limit,
+                        on_sample=on_sample,
+                        cancel_event=cancel_event,
+                        seed=seed,
+                    )
 
                     # Ensure confidence interval is calculated
                     if metric.ci_lower is None or metric.ci_upper is None:
@@ -130,7 +145,13 @@ class BenchmarkSuite:
                 if on_task_start:
                     on_task_start(task.task_id, task.category)
 
-                metric = task.run(gateway.backend, sample_limit=sample_limit, on_sample=on_sample, cancel_event=cancel_event)
+                metric = task.run(
+                    gateway,
+                    sample_limit=effective_sample_limit,
+                    on_sample=on_sample,
+                    cancel_event=cancel_event,
+                    seed=seed,
+                )
                 if metric.ci_lower is None or metric.ci_upper is None:
                     ci_l, ci_u = wilson_score_interval(metric.passed_samples, metric.total_samples)
                     metric.ci_lower = ci_l
@@ -143,9 +164,18 @@ class BenchmarkSuite:
                     on_task_complete(task.task_id, metric)
 
         # 1. Scoring & Categorization
-        category_scores = self.scoring_engine.aggregate_categories(task_metrics)
-        slm_index = self.scoring_engine.compute_slm_index(category_scores)
-        coding_agentic_index = self.scoring_engine.compute_coding_agentic_index(category_scores)
+        scoring_weights = EXTENDED_CATEGORY_WEIGHTS if profile == "extended" else DEFAULT_CATEGORY_WEIGHTS
+        engine = ScoringEngine(category_weights=scoring_weights)
+        category_scores = engine.aggregate_categories(task_metrics)
+        slm_index = engine.compute_slm_index(category_scores)
+        coding_agentic_index = engine.compute_coding_agentic_index(category_scores)
+
+        # Enforce strict leaderboard eligibility rules
+        overall_status, is_eligible = engine.determine_run_status_and_eligibility(
+            task_metrics=task_metrics,
+            profile=profile,
+            sample_limit=effective_sample_limit,
+        )
 
         # 2. Performance Telemetry & Efficiency Index
         telemetry_summary = collector.get_aggregate_summary()
@@ -154,7 +184,7 @@ class BenchmarkSuite:
             valid_tps = [m.avg_tokens_per_sec for m in task_metrics.values() if m.avg_tokens_per_sec]
             avg_tps = (sum(valid_tps) / len(valid_tps)) if valid_tps else 0.0
 
-        local_efficiency = self.scoring_engine.compute_local_efficiency_index(
+        local_efficiency = engine.compute_local_efficiency_index(
             slm_index=slm_index,
             avg_tokens_per_sec=avg_tps,
             model_ram_gb=model_meta.model_ram_gb or hardware_info.model_ram_gb,
@@ -162,24 +192,34 @@ class BenchmarkSuite:
         )
 
         eval_id = str(uuid.uuid4())
-        logger.info(f"Evaluation complete. Aggregate SLM-Index: [bold yellow]{slm_index}%[/bold yellow] (Coding/Agentic: [cyan]{coding_agentic_index}%[/cyan])")
+        logger.info(
+            f"Evaluation complete. Status: [bold]{overall_status}[/bold] (Eligible: {is_eligible}). "
+            f"Aggregate SLM-Index: [bold yellow]{slm_index}%[/bold yellow]"
+        )
 
         return BenchmarkResult(
-            schema_version="1.0.0",
+            schema_version="2.0.0",
             evaluation_id=eval_id,
+            status=overall_status,
+            eligible_for_leaderboard=is_eligible,
+            is_legacy=False,
+            profile=profile,
+            sampling_seed=seed if (effective_sample_limit or profile == "quick") else None,
             model=model_meta,
             hardware=hardware_info,
             tasks=task_metrics,
             categories=category_scores,
             slm_index=slm_index,
-            notes=notes,
-            profile=profile,
             coding_agentic_index=coding_agentic_index,
             local_efficiency=local_efficiency,
+            notes=notes,
             provenance={
                 "profile": profile,
                 "benchmark_count": len(task_metrics),
-                "evaluator_version": "0.2.0",
+                "evaluator_version": "2.0.0",
                 "telemetry": telemetry_summary,
+                "dataset_provenance": {
+                    tid: BENCHMARK_DATASET_META.get(tid, {}) for tid in task_metrics.keys()
+                },
             },
         )

@@ -1,136 +1,130 @@
 """
-Central Benchmark Registry and Evaluation Profiles.
-Provides discovery, dynamic task instantiation, and profiles (quick, standard, extended).
+Central Benchmark Registry and Official Evaluation Profiles.
+Provides discovery and instantiation for established official benchmarks.
+All custom handcrafted evaluations have been completely removed.
 """
 
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional, Type, Callable, Any
 from .base import BaseBenchmarkTask
 
-# Built-in tasks
-from .reasoning_math import ReasoningBenchmark
-from .coding_agent import CodingBenchmark
-from .instruction_following import InstructionFollowingBenchmark
-from .tool_calling import ToolCallingBenchmark
-
-# Expanded benchmark adapters
+# Official benchmark adapters
 from .reasoning.mmlu_pro import MMLUProBenchmark
 from .reasoning.gpqa import GPQADiamondBenchmark
 from .reasoning.bbh import BBHBenchmark
 from .mathematics.gsm8k import GSM8KBenchmark
 from .mathematics.math500 import MATH500Benchmark
+from .instruction.ifeval import IFEvalBenchmark
 from .coding.evalplus import EvalPlusBenchmark
 from .coding.livecodebench import LiveCodeBenchBenchmark
-from .instruction.ifbench import IFBenchBenchmark
 from .tools.bfcl import BFCLBenchmark
 from .context.ruler import RULERBenchmark
 from .safety.safety_adapter import SafetyBenchmark
-from .external.lm_eval_adapter import LMEvalHarnessAdapter
 
 
-# Registry mapping task IDs to Task classes
-BENCHMARK_REGISTRY: Dict[str, Type[BaseBenchmarkTask]] = {
-    # Core tasks
-    "slm_reasoning_cot": ReasoningBenchmark,
-    "slm_coding_agent": CodingBenchmark,
-    "slm_instruction_ifeval": InstructionFollowingBenchmark,
-    "slm_tool_calling_multiturn": ToolCallingBenchmark,
-
-    # Reasoning & Math
+# Registry mapping canonical task IDs to Task classes or factory callables
+BENCHMARK_REGISTRY: Dict[str, Any] = {
+    # Priority 1: Reasoning & Knowledge
     "mmlu_pro": MMLUProBenchmark,
     "gpqa_diamond": GPQADiamondBenchmark,
     "bbh": BBHBenchmark,
+
+    # Priority 2: Mathematics
     "gsm8k": GSM8KBenchmark,
     "math500": MATH500Benchmark,
 
-    # Coding
-    "evalplus": EvalPlusBenchmark,
-    "evalplus_coding": EvalPlusBenchmark,
+    # Priority 3: Coding
+    "evalplus": lambda: EvalPlusBenchmark(subset="humanevalplus"),
+    "evalplus_humanevalplus": lambda: EvalPlusBenchmark(subset="humanevalplus"),
+    "evalplus_mbppplus": lambda: EvalPlusBenchmark(subset="mbppplus"),
     "livecodebench": LiveCodeBenchBenchmark,
 
-    # Instruction & Tools
-    "ifbench": IFBenchBenchmark,
+    # Priority 4: Instruction Following
+    "ifeval": IFEvalBenchmark,
+
+    # Priority 5: Function Calling
     "bfcl": BFCLBenchmark,
-    "bfcl_v4": BFCLBenchmark,
 
-    # Long Context & Safety
+    # Priority 6: Long-Context
     "ruler": RULERBenchmark,
-    "ruler_context": RULERBenchmark,
-    "safety": SafetyBenchmark,
-    "safety_reliability": SafetyBenchmark,
 
-    # LM-Eval Harness bridges
-    "lm_eval_gsm8k": lambda: LMEvalHarnessAdapter("gsm8k"),
-    "lm_eval_mmlu_pro": lambda: LMEvalHarnessAdapter("mmlu_pro"),
+    # Priority 7: Safety
+    "xstest": SafetyBenchmark,
 }
 
-# Aliases for convenience
+# User convenience aliases mapped to canonical official tasks
 TASK_ALIASES: Dict[str, str] = {
-    "reasoning": "slm_reasoning_cot",
-    "math": "slm_reasoning_cot",
-    "coding": "slm_coding_agent",
-    "code": "slm_coding_agent",
-    "instruction": "slm_instruction_ifeval",
-    "ifeval": "slm_instruction_ifeval",
-    "tool_calling": "slm_tool_calling_multiturn",
-    "tools": "slm_tool_calling_multiturn",
+    "gpqa": "gpqa_diamond",
+    "math": "math500",
+    "instruction": "ifeval",
+    "coding": "evalplus",
+    "code": "evalplus",
+    "humaneval": "evalplus",
+    "tools": "bfcl",
+    "tool_calling": "bfcl",
+    "safety": "xstest",
+    "context": "ruler",
 }
 
 # Evaluation Profiles
 EVALUATION_PROFILES: Dict[str, List[str]] = {
+    # Quick: development & smoke testing only. Uses seeded samples, marked PARTIAL.
     "quick": [
-        "slm_reasoning_cot",
-        "slm_coding_agent",
-        "slm_instruction_ifeval",
-        "slm_tool_calling_multiturn",
-    ],
-    "standard": [
-        "slm_reasoning_cot",
-        "slm_coding_agent",
-        "slm_instruction_ifeval",
-        "slm_tool_calling_multiturn",
         "mmlu_pro",
+        "gpqa_diamond",
         "gsm8k",
-        "evalplus",
-        "bfcl",
+        "math500",
+        "ifeval",
     ],
-    "extended": [
-        "slm_reasoning_cot",
-        "slm_coding_agent",
-        "slm_instruction_ifeval",
-        "slm_tool_calling_multiturn",
+    # Standard: complete official datasets for core reasoning, math, and instruction benchmarks.
+    "standard": [
         "mmlu_pro",
         "gpqa_diamond",
         "bbh",
         "gsm8k",
         "math500",
+        "ifeval",
+    ],
+    # Extended: complete official suite including coding, tools, long-context, and safety.
+    "extended": [
+        "mmlu_pro",
+        "gpqa_diamond",
+        "bbh",
+        "gsm8k",
+        "math500",
+        "ifeval",
         "evalplus",
-        "livecodebench",
-        "ifbench",
         "bfcl",
         "ruler",
-        "safety",
+        "xstest",
     ],
 }
 
 
-def get_task(task_name_or_id: str) -> BaseBenchmarkTask:
-    """Retrieve and instantiate a benchmark task by ID or alias."""
-    task_id = TASK_ALIASES.get(task_name_or_id.lower(), task_name_or_id)
-    if task_id not in BENCHMARK_REGISTRY:
-        available = ", ".join(list(BENCHMARK_REGISTRY.keys()) + list(TASK_ALIASES.keys()))
-        raise ValueError(f"Unknown benchmark task '{task_name_or_id}'. Available tasks: {available}")
-    cls_or_fn = BENCHMARK_REGISTRY[task_id]
-    return cls_or_fn()
+def get_task(task_id: str) -> BaseBenchmarkTask:
+    """Instantiate and return benchmark task instance by ID or alias."""
+    clean_id = task_id.lower().strip()
+    canonical_id = TASK_ALIASES.get(clean_id, clean_id)
+
+    if canonical_id not in BENCHMARK_REGISTRY:
+        raise ValueError(
+            f"Unrecognized benchmark task '{task_id}'. "
+            f"Available official benchmarks: {list(BENCHMARK_REGISTRY.keys())}"
+        )
+
+    task_factory = BENCHMARK_REGISTRY[canonical_id]
+    if callable(task_factory):
+        return task_factory()
+    return task_factory()
 
 
 def list_available_tasks() -> List[str]:
-    """Return all registered unique task identifiers."""
+    """Return all registered official benchmark task IDs."""
     return sorted(list(BENCHMARK_REGISTRY.keys()))
 
 
 def get_profile_tasks(profile_name: str) -> List[str]:
-    """Retrieve list of task IDs associated with an evaluation profile."""
-    prof = profile_name.lower().strip()
-    if prof not in EVALUATION_PROFILES:
-        raise ValueError(f"Unknown evaluation profile '{profile_name}'. Choose from: {list(EVALUATION_PROFILES.keys())}")
-    return EVALUATION_PROFILES[prof]
+    """Retrieve task IDs corresponding to an evaluation profile."""
+    p_lower = profile_name.lower().strip()
+    if p_lower not in EVALUATION_PROFILES:
+        raise ValueError(f"Unknown evaluation profile '{profile_name}'. Available: {list(EVALUATION_PROFILES.keys())}")
+    return EVALUATION_PROFILES[p_lower]

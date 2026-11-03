@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-Leaderboard Aggregator Script
-Scans all benchmark JSON result files in data/results/, validates their schemas,
-computes overall rankings across multiple tracks (General Intelligence, Coding & Agentic,
-Local Efficiency), extracts hardware telemetry and Wilson confidence intervals,
-and compiles an aggregated data/leaderboard.json as well as a manifest data/results/index.json
-for static GitHub Pages delivery.
+Leaderboard Aggregator Script (Version 2.0).
+Scans benchmark JSON result files in data/results/, validates their schemas,
+strictly segregates deprecated custom SLM benchmarks from official benchmarks,
+extracts Wilson 95% confidence intervals, hardware telemetry, and status flags (FULL vs PARTIAL),
+and compiles aggregated data/leaderboard.json and data/results/index.json for GitHub Pages.
 """
 
 import json
@@ -30,91 +29,70 @@ def wilson_interval(passed: int, total: int, z: float = 1.95996) -> tuple[float,
     return round(lower, 2), round(upper, 2)
 
 
-def normalize_model_entry(data, file_path):
+def is_legacy_custom_slm_result(data: dict) -> bool:
+    """Detect if a result file is from the deprecated custom handcrafted SLM benchmarks."""
+    tasks = data.get("tasks", {})
+    legacy_keys = {
+        "slm_reasoning_cot",
+        "slm_coding_agent",
+        "slm_instruction_ifeval",
+        "slm_tool_calling_multiturn",
+        "slm_agentic_coding",
+        "slm_instruction_following",
+    }
+    return any(k in tasks for k in legacy_keys) or data.get("schema_version") == "1.0.0" and not any(
+        k in tasks for k in ["mmlu_pro", "gpqa_diamond", "math500"]
+    )
+
+
+def normalize_model_entry(data: dict, file_path: str) -> dict:
     model = data.get("model", {})
-    summary = data.get("summary_scores", {})
     tasks = data.get("tasks", {})
     categories = data.get("categories", {})
     hardware = data.get("hardware", {})
     telemetry_raw = data.get("telemetry", {}) or hardware.get("telemetry", {})
 
-    # Extract or infer standard benchmark metrics
-    gsm8k = (
-        summary.get("gsm8k")
-        or tasks.get("gsm8k", {}).get("score")
-        or tasks.get("gsm8k", {}).get("normalized_score")
-        or categories.get("math", {}).get("normalized_score")
-        or 0.0
-    )
+    is_legacy = is_legacy_custom_slm_result(data) or data.get("is_legacy", False)
+    status = "INVALID" if is_legacy else data.get("status", "FULL")
+    eligible = False if is_legacy else data.get("eligible_for_leaderboard", (status == "FULL"))
 
-    humaneval = (
-        summary.get("humaneval")
-        or tasks.get("humaneval", {}).get("score")
-        or tasks.get("humaneval", {}).get("normalized_score")
-        or tasks.get("slm_coding_agent", {}).get("normalized_score")
-        or tasks.get("slm_agentic_coding", {}).get("normalized_score")
-        or categories.get("coding", {}).get("normalized_score")
-        or 0.0
-    )
+    # Extract official benchmark scores
+    mmlu_pro = tasks.get("mmlu_pro", {}).get("normalized_score")
+    gpqa = tasks.get("gpqa_diamond", {}).get("normalized_score") or tasks.get("gpqa", {}).get("normalized_score")
+    bbh = tasks.get("bbh", {}).get("normalized_score")
+    gsm8k = tasks.get("gsm8k", {}).get("normalized_score")
+    math500 = tasks.get("math500", {}).get("normalized_score")
+    ifeval = tasks.get("ifeval", {}).get("normalized_score")
+    evalplus = tasks.get("evalplus", {}).get("normalized_score")
+    bfcl = tasks.get("bfcl", {}).get("normalized_score")
+    xstest = tasks.get("xstest", {}).get("normalized_score") or tasks.get("safety", {}).get("normalized_score")
 
-    arc = (
-        summary.get("arc")
-        or tasks.get("arc", {}).get("score")
-        or tasks.get("arc", {}).get("normalized_score")
-        or tasks.get("slm_reasoning_cot", {}).get("normalized_score")
-        or categories.get("reasoning", {}).get("normalized_score")
-        or 0.0
-    )
+    # Categories
+    reasoning_cat = categories.get("reasoning", {}).get("normalized_score")
+    math_cat = categories.get("mathematics", {}).get("normalized_score")
+    instruction_cat = categories.get("instruction", {}).get("normalized_score")
+    coding_cat = categories.get("coding", {}).get("normalized_score")
+    tool_cat = categories.get("tool_calling", {}).get("normalized_score")
 
-    ifeval = (
-        summary.get("ifeval")
-        or tasks.get("ifeval", {}).get("score")
-        or tasks.get("ifeval", {}).get("normalized_score")
-        or tasks.get("slm_instruction_ifeval", {}).get("normalized_score")
-        or tasks.get("slm_instruction_following", {}).get("normalized_score")
-        or categories.get("instruction", {}).get("normalized_score")
-        or 0.0
-    )
-
-    tool_calling = (
-        summary.get("tool_calling")
-        or tasks.get("tool_calling", {}).get("score")
-        or tasks.get("tool_calling", {}).get("normalized_score")
-        or tasks.get("slm_tool_calling_multiturn", {}).get("normalized_score")
-        or categories.get("tool_calling", {}).get("normalized_score")
-        or 0.0
-    )
-
-    # Determine overall score (SLM-Index)
-    overall = data.get("slm_index")
-    if overall is None:
-        overall = summary.get("overall_score")
-    if overall is None:
-        weights = [0.25, 0.25, 0.20, 0.15, 0.15]
-        scores = [gsm8k, humaneval, arc, ifeval, tool_calling]
-        overall = sum(w * s for w, s in zip(weights, scores))
-
-    param_count = float(model.get("param_count_b", 0.0))
+    slm_index = data.get("slm_index", 0.0)
+    param_count = float(model.get("param_count_b", 0.0) or 0.0)
 
     # Parameter Category Tier
     tier = model.get("param_tier")
     if not tier or tier == "unknown":
         if param_count < 3.0:
             tier = "< 3B"
-        elif param_count <= 7.0:
-            tier = "3B–7B"
+        elif param_count <= 8.0:
+            tier = "3B–8B"
         elif param_count <= 14.0:
-            tier = "7B–14B"
-        elif param_count <= 32.0:
-            tier = "14B–32B"
+            tier = "8B–14B"
+        elif param_count <= 35.0:
+            tier = "14B–35B"
         else:
-            tier = "32B+"
+            tier = "35B+"
 
-    # Hugging Face URL
     model_id = model.get("model_id", "unknown/unknown")
-    hf_url = model.get("hf_url")
-    if not hf_url:
-        hf_url = f"https://huggingface.co/{model_id}"
+    hf_url = model.get("hf_url") or f"https://huggingface.co/{model_id}"
 
     model_ram = hardware.get("model_ram_gb") or model.get("model_ram_gb") or data.get("model_ram_gb")
     if model_ram is None and param_count:
@@ -128,7 +106,6 @@ def normalize_model_entry(data, file_path):
         else:
             model_ram = round(param_count * 0.85, 2)
 
-    # Calculate aggregate throughput and latency
     task_speeds = [
         t.get("avg_tokens_per_sec")
         for t in tasks.values()
@@ -137,7 +114,6 @@ def normalize_model_entry(data, file_path):
     avg_tokens_per_sec = (
         telemetry_raw.get("decode_tok_per_sec")
         or (sum(task_speeds) / len(task_speeds) if task_speeds else None)
-        or summary.get("avg_tokens_per_sec")
     )
     if avg_tokens_per_sec is not None:
         avg_tokens_per_sec = round(float(avg_tokens_per_sec), 1)
@@ -150,83 +126,19 @@ def normalize_model_entry(data, file_path):
     avg_latency_ms = (
         telemetry_raw.get("ttft_ms")
         or (sum(task_latencies) / len(task_latencies) if task_latencies else None)
-        or summary.get("avg_latency_ms")
     )
     if avg_latency_ms is not None:
         avg_latency_ms = round(float(avg_latency_ms), 1)
 
-    # Wilson Confidence Interval on Overall Score
-    ci_lower = data.get("ci_lower")
-    ci_upper = data.get("ci_upper")
-    if ci_lower is None or ci_upper is None:
-        total_p = sum(t.get("passed_samples", 0) for t in tasks.values() if isinstance(t, dict))
-        total_s = sum(t.get("total_samples", 0) for t in tasks.values() if isinstance(t, dict))
-        if total_s > 0:
-            ci_lower, ci_upper = wilson_interval(total_p, total_s)
-        else:
-            ci_lower = round(max(0.0, float(overall) - 3.5), 1)
-            ci_upper = round(min(100.0, float(overall) + 3.5), 1)
-
-    # Profile detection
-    profile = data.get("profile")
-    if not profile:
-        total_s = sum(t.get("total_samples", 0) for t in tasks.values() if isinstance(t, dict))
-        if len(tasks) <= 4 and total_s <= 25:
-            profile = "quick"
-        elif len(tasks) >= 9:
-            profile = "extended"
-        else:
-            profile = "standard"
-
-    # Multi-Track Indices
-    # 1. Coding & Agentic Index (60% coding + 40% tool calling)
-    coding_agentic_index = data.get("coding_agentic_index")
-    if coding_agentic_index is None:
-        coding_score = categories.get("coding", {}).get("normalized_score") or humaneval
-        tool_score = categories.get("tool_calling", {}).get("normalized_score") or tool_calling
-        coding_agentic_index = round(0.60 * coding_score + 0.40 * tool_score, 2)
+    # Wilson CI calculation across evaluated samples
+    total_p = sum(t.get("passed_samples", 0) for t in tasks.values() if isinstance(t, dict))
+    total_s = sum(t.get("total_samples", 0) for t in tasks.values() if isinstance(t, dict))
+    if total_s > 0:
+        ci_lower, ci_upper = wilson_interval(total_p, total_s)
     else:
-        coding_agentic_index = round(float(coding_agentic_index), 2)
+        ci_lower, ci_upper = 0.0, 0.0
 
-    # 2. Local Efficiency Index (Score per GB, throughput TPS, efficiency score)
-    local_efficiency = data.get("local_efficiency")
-    if not local_efficiency or not isinstance(local_efficiency, dict):
-        effective_ram = float(model_ram or 8.0)
-        score_per_gb = round(float(overall) / max(1.0, effective_ram), 2)
-        tps = float(avg_tokens_per_sec or 0.0)
-        throughput_norm = min(100.0, (tps / 60.0) * 100.0)
-        footprint_norm = min(100.0, (8.0 / max(1.0, effective_ram)) * 100.0)
-        eff_score = round(0.5 * float(overall) + 0.3 * throughput_norm + 0.2 * footprint_norm, 2)
-        local_efficiency = {
-            "score_per_gb": score_per_gb,
-            "throughput_tps": tps,
-            "effective_memory_gb": effective_ram,
-            "efficiency_score": eff_score,
-        }
-    else:
-        if "score_per_gb" not in local_efficiency and model_ram:
-            local_efficiency["score_per_gb"] = round(float(overall) / max(1.0, float(model_ram)), 2)
-
-    # Telemetry snapshot
-    telemetry = {
-        "ttft_ms": telemetry_raw.get("ttft_ms") or avg_latency_ms,
-        "decode_tok_per_sec": telemetry_raw.get("decode_tok_per_sec") or avg_tokens_per_sec,
-        "tpot_ms": telemetry_raw.get("tpot_ms"),
-        "peak_ram_mb": telemetry_raw.get("peak_ram_mb"),
-        "peak_vram_mb": telemetry_raw.get("peak_vram_mb"),
-    }
-
-    # Extended benchmark task scores if present
-    extended_scores = {}
-    for task_key in [
-        "mmlu_pro", "gpqa_diamond", "gpqa", "bbh", "math500", "evalplus",
-        "livecodebench", "ifbench", "bfcl", "ruler", "safety", "harmbench", "xstest"
-    ]:
-        if task_key in tasks:
-            t = tasks[task_key]
-            val = t.get("normalized_score") or t.get("score")
-            if val is not None:
-                extended_scores[task_key] = round(float(val), 2)
+    profile = data.get("profile", "standard")
 
     return {
         "filename": os.path.basename(file_path),
@@ -234,11 +146,9 @@ def normalize_model_entry(data, file_path):
         "evaluation_id": data.get("evaluation_id", "N/A"),
         "timestamp": data.get("timestamp", datetime.now(timezone.utc).isoformat()),
         "profile": profile,
-        "submitter": data.get("submitter", {
-            "name": "Community Contributor",
-            "github_handle": "anonymous",
-            "affiliation": "Open Source"
-        }),
+        "status": status,
+        "eligible_for_leaderboard": eligible,
+        "is_legacy": is_legacy,
         "model": {
             "model_id": model_id,
             "model_slug": model.get("model_slug", model_id.replace("/", "-")),
@@ -248,135 +158,135 @@ def normalize_model_entry(data, file_path):
             "architecture": model.get("architecture", "Transformer"),
             "quantization": model.get("quantization", "BF16"),
             "model_ram_gb": model_ram,
-            "context_length": model.get("context_length", 32768),
-            "license": model.get("license", "Unknown"),
             "backend": model.get("backend", "transformers"),
-            "reasoning_effort": model.get("reasoning_effort")
+            "license": model.get("license", "Unknown"),
+            "reasoning_effort": model.get("reasoning_effort"),
         },
         "scores": {
-            "overall": round(float(overall), 2),
+            "slm_index": round(float(slm_index), 2),
             "ci_lower": ci_lower,
             "ci_upper": ci_upper,
-            "coding_agentic_index": coding_agentic_index,
-            "local_efficiency_score": local_efficiency.get("efficiency_score"),
-            "score_per_gb": local_efficiency.get("score_per_gb"),
-            "gsm8k": round(float(gsm8k), 2),
-            "humaneval": round(float(humaneval), 2),
-            "arc": round(float(arc), 2),
-            "ifeval": round(float(ifeval), 2),
-            "tool_calling": round(float(tool_calling), 2),
-            **extended_scores
+            "coding_agentic": data.get("coding_agentic_index"),
+            # Canonical Official Benchmarks
+            "mmlu_pro": round(float(mmlu_pro), 2) if mmlu_pro is not None else None,
+            "gpqa_diamond": round(float(gpqa), 2) if gpqa is not None else None,
+            "bbh": round(float(bbh), 2) if bbh is not None else None,
+            "gsm8k": round(float(gsm8k), 2) if gsm8k is not None else None,
+            "math500": round(float(math500), 2) if math500 is not None else None,
+            "ifeval": round(float(ifeval), 2) if ifeval is not None else None,
+            "evalplus": round(float(evalplus), 2) if evalplus is not None else None,
+            "bfcl": round(float(bfcl), 2) if bfcl is not None else None,
+            "xstest": round(float(xstest), 2) if xstest is not None else None,
+            # Compatibility aliases
+            "overall": round(float(slm_index), 2),
+            "coding_agentic_index": data.get("coding_agentic_index") or data.get("scores", {}).get("coding_agentic_index"),
+            "score_per_gb": (data.get("local_efficiency") or {}).get("score_per_gb") if isinstance(data.get("local_efficiency"), dict) else None,
+            # Pillar Aggregates
+            "reasoning": round(float(reasoning_cat), 2) if reasoning_cat is not None else None,
+            "mathematics": round(float(math_cat), 2) if math_cat is not None else None,
+            "instruction": round(float(instruction_cat), 2) if instruction_cat is not None else None,
+            "coding": round(float(coding_cat), 2) if coding_cat is not None else None,
+            "tool_calling": round(float(tool_cat), 2) if tool_cat is not None else None,
         },
         "hardware": {
-            "gpu_name": hardware.get("gpu_name", "N/A"),
-            "gpu_count": hardware.get("gpu_count", 1),
-            "gpu_vram_gb": hardware.get("gpu_vram_gb", 0.0),
-            "cpu": hardware.get("cpu", "N/A"),
-            "cpu_cores": hardware.get("cpu_cores", 0),
-            "total_ram_gb": hardware.get("total_ram_gb", 0.0),
-            "model_ram_gb": model_ram,
             "os": hardware.get("os", "Linux"),
-            "cuda_version": hardware.get("cuda_version", "N/A"),
-            "driver_version": hardware.get("driver_version", "N/A")
+            "cpu": hardware.get("cpu", "Unknown CPU"),
+            "cpu_cores": hardware.get("cpu_cores", 8),
+            "total_ram_gb": hardware.get("total_ram_gb", 16.0),
+            "gpu_name": hardware.get("gpu_name") or "CPU",
+            "gpu_count": hardware.get("gpu_count", 0),
+            "gpu_vram_gb": hardware.get("gpu_vram_gb"),
+            "cuda_version": hardware.get("cuda_version"),
         },
-        "telemetry": telemetry,
-        "local_efficiency": local_efficiency,
-        "categories": categories,
-        "tasks": tasks,
-        "provenance": data.get("provenance", {}),
-        "notes": data.get("notes") or "",
-        "raw_logs_preview": data.get("raw_logs_preview") or data.get("notes") or "Benchmark run completed successfully."
+        "telemetry": {
+            "ttft_ms": avg_latency_ms,
+            "decode_tok_per_sec": avg_tokens_per_sec,
+            "total_samples": total_s,
+            "passed_samples": total_p,
+        },
     }
 
 
 def main():
-    repo_root = Path(__file__).resolve().parent.parent
-    results_dir = repo_root / "data" / "results"
-    output_leaderboard = repo_root / "data" / "leaderboard.json"
-    output_index = repo_root / "data" / "results" / "index.json"
+    base_dir = Path(__file__).resolve().parent.parent
+    results_dirs = [
+        base_dir / "data" / "results",
+        Path("data/results"),
+        Path("Website/data/results"),
+        Path("website/data/results"),
+    ]
+    results_dir = None
+    for d in results_dirs:
+        if d.exists():
+            results_dir = d
+            break
 
-    json_files = sorted(glob.glob(str(results_dir / "*.json")))
-    root_results_dir = repo_root.parent / "data" / "results"
-    if root_results_dir.exists() and root_results_dir != results_dir:
-        json_files += sorted(glob.glob(str(root_results_dir / "*.json")))
+    if not results_dir:
+        print("No results directory found.")
+        sys.exit(0)
 
-    # Deduplicate and exclude index.json
-    seen_basenames = set()
-    filtered_json_files = []
+    json_files = glob.glob(str(results_dir / "*.json"))
+    models = []
     for f in json_files:
-        basename = os.path.basename(f)
-        if not basename.endswith("index.json") and basename not in seen_basenames:
-            seen_basenames.add(basename)
-            filtered_json_files.append(f)
-    json_files = filtered_json_files
-
-    print(f"[Leaderboard Aggregator] Found {len(json_files)} result files in {results_dir}")
-
-    records = []
-    for f in json_files:
+        if f.endswith("index.json") or f.endswith("leaderboard.json"):
+            continue
         try:
             with open(f, "r", encoding="utf-8") as fp:
                 data = json.load(fp)
-            backend = str(data.get("model", {}).get("backend", "")).strip().lower()
-            if backend == "mock":
-                print(f"[SKIP] {os.path.basename(f)}: mock backend, not a real evaluation")
-                continue
             entry = normalize_model_entry(data, f)
-            records.append(entry)
+            models.append(entry)
         except Exception as e:
-            print(f"[WARN] Failed to process {f}: {e}", file=sys.stderr)
+            print(f"Error parsing {f}: {e}")
 
-    # Sort descending by overall score
-    records.sort(key=lambda r: r["scores"]["overall"], reverse=True)
+    # Sort: Eligible full official runs first, by SLM-Index descending
+    models.sort(key=lambda m: (1 if m["eligible_for_leaderboard"] else 0, m["scores"]["slm_index"]), reverse=True)
 
-    # Assign ranks
-    for rank, entry in enumerate(records, start=1):
-        entry["rank"] = rank
+    # Assign ranks to eligible official runs
+    rank = 1
+    for m in models:
+        if m["eligible_for_leaderboard"]:
+            m["rank"] = rank
+            rank += 1
+        else:
+            m["rank"] = "-"
 
-    # Compute high-level stats
-    stats = {
-        "total_models": len(records),
-        "last_updated": datetime.now(timezone.utc).isoformat(),
-        "highest_overall": records[0]["scores"]["overall"] if records else 0.0,
-        "best_by_benchmark": {
-            "gsm8k": max([r["scores"]["gsm8k"] for r in records], default=0.0),
-            "humaneval": max([r["scores"]["humaneval"] for r in records], default=0.0),
-            "arc": max([r["scores"]["arc"] for r in records], default=0.0),
-            "ifeval": max([r["scores"]["ifeval"] for r in records], default=0.0),
-            "tool_calling": max([r["scores"]["tool_calling"] for r in records], default=0.0),
-        } if records else {},
-        "best_by_track": {
-            "top_overall": records[0]["model"]["model_id"] if records else "N/A",
-            "top_overall_score": records[0]["scores"]["overall"] if records else 0.0,
-            "top_coding_agentic": max(records, key=lambda r: r["scores"]["coding_agentic_index"])["model"]["model_id"] if records else "N/A",
-            "top_coding_agentic_score": max([r["scores"]["coding_agentic_index"] for r in records], default=0.0),
-            "top_efficiency": max(records, key=lambda r: r["scores"].get("score_per_gb") or 0.0)["model"]["model_id"] if records else "N/A",
-            "top_efficiency_score": max([r["scores"].get("score_per_gb") or 0.0 for r in records], default=0.0),
-            "top_throughput": max(records, key=lambda r: r["telemetry"].get("decode_tok_per_sec") or 0.0)["model"]["model_id"] if records else "N/A",
-            "top_throughput_tps": max([r["telemetry"].get("decode_tok_per_sec") or 0.0 for r in records], default=0.0),
-        } if records else {},
-        "unique_profiles": sorted(list(set(r.get("profile", "standard") for r in records))),
-        "unique_architectures": sorted(list(set(r["model"]["architecture"] for r in records))),
-        "unique_licenses": sorted(list(set(r["model"]["license"] for r in records))),
-        "unique_quantizations": sorted(list(set(r["model"]["quantization"] for r in records)))
+    metadata = {
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "total_models": len(models),
+        "official_models_count": sum(1 for m in models if m["eligible_for_leaderboard"]),
     }
 
-    leaderboard_payload = {
-        "metadata": stats,
-        "models": records
+    leaderboard = {
+        "metadata": metadata,
+        "updated_at": metadata["updated_at"],
+        "total_models": len(models),
+        "official_models_count": metadata["official_models_count"],
+        "models": models,
     }
 
-    with open(output_leaderboard, "w", encoding="utf-8") as fp:
-        json.dump(leaderboard_payload, fp, indent=2)
-    print(f"[OK] Generated {output_leaderboard} with {len(records)} entries.")
+    out_file = results_dir.parent / "leaderboard.json"
+    with open(out_file, "w", encoding="utf-8") as fp:
+        json.dump(leaderboard, fp, indent=2)
 
-    manifest_payload = {
-        "count": len(records),
-        "files": [r["filename"] for r in records]
+    index_data = {
+        "updated_at": metadata["updated_at"],
+        "total_models": len(models),
+        "models": [
+            {
+                "filename": m["filename"],
+                "model_id": m["model"]["model_id"],
+                "model_slug": m["model"]["model_slug"],
+                "slm_index": m["scores"]["slm_index"],
+                "status": m["status"],
+                "eligible": m["eligible_for_leaderboard"],
+            }
+            for m in models
+        ],
     }
-    with open(output_index, "w", encoding="utf-8") as fp:
-        json.dump(manifest_payload, fp, indent=2)
-    print(f"[OK] Generated manifest {output_index}.")
+    with open(results_dir / "index.json", "w", encoding="utf-8") as fp:
+        json.dump(index_data, fp, indent=2)
+
+    print(f"Successfully aggregated {len(models)} models ({leaderboard['official_models_count']} official) into {out_file}")
 
 
 if __name__ == "__main__":

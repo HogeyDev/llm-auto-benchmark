@@ -1,49 +1,35 @@
 """
-GPQA Diamond benchmark adapter.
-Advanced graduate-level science reasoning across Biology, Chemistry, and Physics.
-Evaluated with expert-validated, Google-proof questions with choices shuffled.
+Official GPQA Diamond Benchmark Adapter.
+Evaluates Google-proof, expert-validated graduate-level science reasoning across Biology, Chemistry, and Physics.
+Uses the genuine 198-question GPQA Diamond dataset from idavidrein/gpqa.
+Choices are randomized with a reproducible seed and the answer key is remapped before evaluation.
 """
 
+import random
+import time
+import re
 from typing import Optional, List, Dict, Any
 from ..base import BaseBenchmarkTask
 from ...backends.base import BaseInferenceBackend
-from ...models.schema import TaskMetric
-from ...metrics.confidence import compute_metric_confidence
-from .mmlu_pro import extract_multichoice_answer
+from ...models.schema import TaskMetric, QuestionResult
+from ...metrics.confidence import wilson_score_interval
+from ...datasets.manager import DatasetManager
+from .mmlu_pro import extract_mmlu_pro_answer
+from ...utils.logger import logger
 
 
-GPQA_DIAMOND_DATASET = [
-    {
-        "id": "gpqa_chem_organic_synthesis",
-        "domain": "chemistry",
-        "question": "A chemist reacts 1-bromo-4-nitrobenzene with potassium tert-butoxide in tert-butanol at 80 degrees Celsius. What is the major organic transformation pathway observed?\n(A) Elimination-addition via a benzyne intermediate\n(B) Direct SN2 displacement of bromide by tert-butoxide\n(C) Unimolecular SN1 ionization forming an aryl cation\n(D) No reaction or trace nucleophilic aromatic substitution (SNAr) due to steric hindrance and electron deficiency",
-        "expected": "D",
-    },
-    {
-        "id": "gpqa_phys_condensed_matter_bcs",
-        "domain": "physics",
-        "question": "In the microscopic BCS theory of superconductivity, what is the fundamental origin of the attractive pairing potential between two electrons forming a Cooper pair?\n(A) Direct Coulomb electrostatic attraction\n(B) Virtual phonon exchange mediated by the positively charged ionic lattice\n(C) Spin-orbit coupling induced by heavy atomic nuclei\n(D) Relativistic magnetic dipole-dipole interaction",
-        "expected": "B",
-    },
-    {
-        "id": "gpqa_bio_molecular_transcription",
-        "domain": "biology",
-        "question": "In eukaryotic transcription by RNA Polymerase II, the phosphorylation of which specific heptapeptide repeat residue in the C-terminal domain (CTD) triggers transition from transcription initiation to early elongation?\n(A) Serine 2\n(B) Serine 5\n(C) Tyrosine 1\n(D) Threonine 4",
-        "expected": "B",
-    },
-    {
-        "id": "gpqa_phys_thermo_entropy_mixing",
-        "domain": "physics",
-        "question": "Two distinct ideal gases, each at identical temperature T and pressure P, are contained in separate chambers of volumes V1 and V2. When the partition is removed, what is the total change in entropy of mixing Delta S_mix?\n(A) Zero\n(B) k_B * [N1*ln((V1+V2)/V1) + N2*ln((V1+V2)/V2)]\n(C) -k_B * (N1 + N2) * ln(2)\n(D) (N1 + N2) * k_B * T",
-        "expected": "B",
-    },
-]
+def extract_gpqa_choice(text: str) -> Optional[str]:
+    """
+    Deterministic extraction of choice A, B, C, or D.
+    Strictly prohibits granting credit for mentioning answer words in explanations.
+    """
+    return extract_mmlu_pro_answer(text, num_options=4)
 
 
 class GPQADiamondBenchmark(BaseBenchmarkTask):
     """Evaluates graduate-level domain reasoning on expert-validated scientific questions."""
 
-    def __init__(self):
+    def __init__(self, dataset_manager: Optional[DatasetManager] = None):
         super().__init__(
             task_id="gpqa_diamond",
             category="reasoning",
@@ -51,6 +37,7 @@ class GPQADiamondBenchmark(BaseBenchmarkTask):
             raw_metric_name="accuracy",
             weight=1.0,
         )
+        self.dm = dataset_manager or DatasetManager()
 
     def run(
         self,
@@ -58,82 +45,136 @@ class GPQADiamondBenchmark(BaseBenchmarkTask):
         sample_limit: Optional[int] = None,
         on_sample: Optional[Any] = None,
         cancel_event: Optional[Any] = None,
+        seed: int = 42,
     ) -> TaskMetric:
-        dataset = GPQA_DIAMOND_DATASET[:sample_limit] if sample_limit else GPQA_DIAMOND_DATASET
+        # Load official 198-question GPQA Diamond dataset
+        full_dataset = self.dm.load_gpqa_diamond()
+
+        if sample_limit and sample_limit < len(full_dataset):
+            dataset, selected_ids = self.dm.sample_stratified(
+                full_dataset,
+                sample_size=sample_limit,
+                seed=seed,
+                stratify_key="high_level_domain",
+            )
+            run_status = "PARTIAL"
+        else:
+            dataset = full_dataset
+            run_status = "FULL"
+
         total = len(dataset)
         passed = 0
-        total_latency = 0.0
-        total_tokens = 0
-        breakdown = []
+        invalid_count = 0
+        domain_stats: Dict[str, Dict[str, int]] = {}
+        question_results: List[QuestionResult] = []
 
         system_prompt = (
-            "You are an expert scientific researcher. Analyze the scientific question carefully. "
-            "Think through the physical mechanisms step by step. Conclude with '#### <letter>' (A, B, C, or D)."
+            "What is the correct answer to this question? "
+            "Think step by step and then finish your answer by stating '#### <choice>' "
+            "where <choice> is one of A, B, C, or D."
         )
+
+        total_latency_ms = 0.0
+        total_tokens = 0
+
+        # Reproducible random generator for choice shuffling
+        shuffle_rng = random.Random(seed)
 
         for idx, item in enumerate(dataset):
             if cancel_event and cancel_event.is_set():
-                break
+                raise InterruptedError("GPQA Diamond evaluation cancelled.")
 
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"{item['question']}\n\nSelect the correct option:"},
-            ]
+            domain = item.get("high_level_domain") or item.get("subdomain") or "General Science"
+            domain_stats.setdefault(domain, {"total": 0, "passed": 0})
+            domain_stats[domain]["total"] += 1
 
-            gen = backend.chat(messages, max_new_tokens=256, temperature=0.0)
-            total_latency += gen.latency_ms
+            # Prepare choices and shuffle order reproducibly
+            correct_text = item["correct_answer"]
+            incorrects = [item["incorrect_1"], item["incorrect_2"], item["incorrect_3"]]
+            choices = [correct_text] + incorrects
+            shuffle_rng.shuffle(choices)
+
+            # Determine remapped correct option letter
+            correct_index = choices.index(correct_text)
+            expected_letter = chr(ord('A') + correct_index)
+
+            options_str = "\n".join([f"({chr(ord('A') + i)}) {c}" for i, c in enumerate(choices)])
+            prompt = f"Question: {item['question']}\n\nChoices:\n{options_str}\n\nAnswer:"
+
+            start_t = time.perf_counter()
+            gen = backend.chat(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                max_new_tokens=1024,
+                temperature=0.0,
+            )
+            latency_ms = (time.perf_counter() - start_t) * 1000.0
+            total_latency_ms += latency_ms
             total_tokens += gen.tokens_generated
 
-            extracted = extract_multichoice_answer(gen.text, valid_options="ABCD")
-            expected = item["expected"]
-            is_correct = (extracted == expected) if extracted else False
-
-            if not is_correct and ("phonon" in gen.text.lower() and "bcs" in item["question"].lower()):
+            extracted = extract_gpqa_choice(gen.text)
+            is_correct = False
+            if extracted is None:
+                invalid_count += 1
+            elif extracted.upper() == expected_letter:
                 is_correct = True
-            elif not is_correct and ("serine 5" in gen.text.lower()):
-                is_correct = True
-
-            if is_correct:
                 passed += 1
+                domain_stats[domain]["passed"] += 1
+
+            q_res = QuestionResult(
+                question_id=item["question_id"],
+                raw_prompt=prompt,
+                raw_response=gen.text,
+                extracted_answer=extracted,
+                expected_answer=expected_letter,
+                is_correct=is_correct,
+                evaluation_error=None if extracted else "Unparsable or ambiguous answer",
+                tokens_prompt=len(prompt.split()),
+                tokens_generated=gen.tokens_generated,
+                latency_ms=round(latency_ms, 2),
+            )
+            question_results.append(q_res)
 
             if on_sample:
-                on_sample({
-                    "task_id": self.task_id,
-                    "category": self.category,
-                    "sample_index": idx + 1,
-                    "total_samples": total,
-                    "prompt": item["question"],
-                    "response": gen.text,
-                    "expected": expected,
-                    "extracted": extracted,
-                    "passed": is_correct,
-                    "latency_ms": gen.latency_ms,
-                    "tokens": gen.tokens_generated,
-                })
+                on_sample(self.task_id, idx + 1, total, is_correct)
 
-            breakdown.append({
-                "id": item["id"],
-                "domain": item.get("domain", "science"),
-                "expected": expected,
-                "extracted": extracted,
-                "passed": is_correct,
-            })
+        accuracy = (passed / total) * 100.0 if total > 0 else 0.0
+        ci_lower, ci_upper = wilson_score_interval(passed, total)
 
-        acc = (passed / total) if total > 0 else 0.0
-        conf = compute_metric_confidence(passed, total)
+        sub_breakdown = {}
+        for d_name, stats in domain_stats.items():
+            d_tot = stats["total"]
+            d_pas = stats["passed"]
+            d_acc = (d_pas / d_tot * 100.0) if d_tot > 0 else 0.0
+            sub_breakdown[d_name] = {
+                "accuracy": round(d_acc, 2),
+                "passed": d_pas,
+                "total": d_tot,
+            }
+
+        avg_latency = total_latency_ms / max(1, total)
+        avg_tps = (total_tokens / (total_latency_ms / 1000.0)) if total_latency_ms > 0 else 0.0
 
         return TaskMetric(
             task_id=self.task_id,
             category=self.category,
-            raw_score=round(acc, 4),
-            raw_metric_name=self.raw_metric_name,
-            normalized_score=round(acc * 100.0, 2),
+            status=run_status,
+            raw_score=round(passed / max(1, total), 4),
+            raw_metric_name="accuracy",
+            normalized_score=round(accuracy, 2),
             total_samples=total,
             passed_samples=passed,
-            avg_latency_ms=round(total_latency / max(1, total), 2),
-            avg_tokens_per_sec=round(total_tokens / max(0.001, total_latency / 1000.0), 2),
-            sub_metrics={
-                "confidence_interval": conf,
-                "details": breakdown,
-            },
+            failed_samples=total - passed,
+            invalid_responses=invalid_count,
+            ci_lower=ci_lower,
+            ci_upper=ci_upper,
+            dataset_name="idavidrein/gpqa",
+            dataset_revision="diamond-4b24",
+            split="diamond",
+            avg_latency_ms=round(avg_latency, 2),
+            avg_tokens_per_sec=round(avg_tps, 2),
+            sub_metrics={"by_domain": sub_breakdown},
+            question_results=question_results,
         )

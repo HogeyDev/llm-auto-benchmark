@@ -48,4 +48,9 @@ Thumbs.db
 
 # Agent skills & caches
 .agents/
+
+# Downloaded benchmark datasets cache
+data/datasets/
+data/results/*.json
+!Website/data/results/*.json
 .gemini/

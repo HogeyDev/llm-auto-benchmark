@@ -1,57 +1,111 @@
 """
-GSM8K mathematical reasoning benchmark adapter.
-Multi-step grade school mathematical word problems requiring arithmetic computation.
+Official GSM8K Benchmark Adapter.
+Evaluates multi-step arithmetic reasoning on the official test split (1,319 problems).
+Uses strict deterministic numerical extraction from ground truth '#### <number>' format.
+Never awards credit merely because a number appears somewhere in the explanation.
 """
 
 import re
+import time
 from typing import Optional, List, Dict, Any
 from ..base import BaseBenchmarkTask
 from ...backends.base import BaseInferenceBackend
-from ...models.schema import TaskMetric
-from ...metrics.confidence import compute_metric_confidence
-from ..reasoning_math import extract_reasoning_answer
+from ...models.schema import TaskMetric, QuestionResult
+from ...metrics.confidence import wilson_score_interval
+from ...datasets.manager import DatasetManager
+from ...utils.logger import logger
 
 
-GSM8K_BENCHMARK_DATASET = [
-    {
-        "id": "gsm8k_001_baker",
-        "question": "A bakery makes 40 loaves of bread every morning. They sell 25 loaves before noon and 10 loaves in the afternoon. At the end of the day, how many loaves of bread remain unsold?",
-        "expected": "5",
-    },
-    {
-        "id": "gsm8k_002_library",
-        "question": "A library has 120 books on science. A donor gives 45 more science books. Later, 30 books are checked out by students. How many science books are currently on the shelves?",
-        "expected": "135",
-    },
-    {
-        "id": "gsm8k_003_savings",
-        "question": "Maria saves $15 every week for 8 weeks. She then buys a jacket for $70. How much money does she have left from her savings?",
-        "expected": "50",
-    },
-    {
-        "id": "gsm8k_004_garden_fencing",
-        "question": "A rectangular garden is 15 meters long and 10 meters wide. What is the total perimeter in meters that needs to be fenced?",
-        "expected": "50",
-    },
-    {
-        "id": "gsm8k_005_bus_passengers",
-        "question": "A bus starts with 24 passengers. At the first stop, 6 get off and 10 get on. At the second stop, 8 get off. How many passengers are on the bus now?",
-        "expected": "20",
-    },
-]
+def normalize_numeric_string(s: str) -> Optional[str]:
+    """Normalize numeric string by removing commas, currency signs, and trailing zero decimals."""
+    if not s:
+        return None
+    clean = s.strip()
+    clean = clean.replace("$", "").replace(",", "").replace("%", "").strip()
+
+    # Match integer or float
+    m = re.match(r"^-?\d+(?:\.\d+)?$", clean)
+    if not m:
+        return None
+
+    try:
+        val = float(clean)
+        # If integer representation, return as integer string
+        if val.is_integer():
+            return str(int(val))
+        return str(val)
+    except ValueError:
+        return None
+
+
+def extract_gsm8k_answer(text: str) -> Optional[str]:
+    """
+    Deterministically extract the final numerical answer from model response.
+    Prioritizes:
+    1. '#### <number>'
+    2. '\\boxed{<number>}'
+    3. 'the answer is <number>'
+    4. Terminal line number
+    Never accepts arbitrary numbers mentioned in reasoning.
+    """
+    if not text:
+        return None
+    clean = text.strip()
+
+    # 1. Official #### marker
+    if "####" in clean:
+        after_hash = clean.split("####")[-1].strip()
+        num_m = re.search(r"(-?\$?\d[\d,]*(?:\.\d+)?)", after_hash)
+        if num_m:
+            norm = normalize_numeric_string(num_m.group(1))
+            if norm:
+                return norm
+
+    # 2. Boxed notation
+    boxed = re.findall(r"\\boxed\{([^{}]+)\}", clean)
+    if boxed:
+        num_m = re.search(r"(-?\$?\d[\d,]*(?:\.\d+)?)", boxed[-1].strip())
+        if num_m:
+            norm = normalize_numeric_string(num_m.group(1))
+            if norm:
+                return norm
+
+    # 3. Explicit final answer phrases
+    phrases = re.findall(
+        r"(?:the (?:final )?answer is|result is|the total is)\s*[:=]?\s*(-?\$?\d[\d,]*(?:\.\d+)?)",
+        clean,
+        re.IGNORECASE,
+    )
+    if phrases:
+        norm = normalize_numeric_string(phrases[-1])
+        if norm:
+            return norm
+
+    # 4. Strict last line match if standalone number
+    lines = [l.strip() for l in clean.splitlines() if l.strip()]
+    if lines:
+        last = lines[-1].rstrip(".")
+        num_m = re.search(r"^(?:answer\s*[:=]?\s*)?(-?\$?\d[\d,]*(?:\.\d+)?)$", last, re.IGNORECASE)
+        if num_m:
+            norm = normalize_numeric_string(num_m.group(1))
+            if norm:
+                return norm
+
+    return None
 
 
 class GSM8KBenchmark(BaseBenchmarkTask):
-    """Evaluates multi-step arithmetic reasoning on GSM8K word problems."""
+    """Evaluates multi-step mathematical word problem solving on official GSM8K."""
 
-    def __init__(self):
+    def __init__(self, dataset_manager: Optional[DatasetManager] = None):
         super().__init__(
             task_id="gsm8k",
-            category="reasoning",
-            description="GSM8K grade-school multi-step mathematical word problems.",
+            category="mathematics",
+            description="GSM8K official test split (1,319 multi-step math word problems).",
             raw_metric_name="accuracy",
             weight=1.0,
         )
+        self.dm = dataset_manager or DatasetManager()
 
     def run(
         self,
@@ -59,85 +113,107 @@ class GSM8KBenchmark(BaseBenchmarkTask):
         sample_limit: Optional[int] = None,
         on_sample: Optional[Any] = None,
         cancel_event: Optional[Any] = None,
+        seed: int = 42,
     ) -> TaskMetric:
-        dataset = GSM8K_BENCHMARK_DATASET[:sample_limit] if sample_limit else GSM8K_BENCHMARK_DATASET
+        # Load official GSM8K test split (1,319 questions)
+        full_dataset = self.dm.load_gsm8k()
+
+        if sample_limit and sample_limit < len(full_dataset):
+            dataset, selected_ids = self.dm.sample_stratified(
+                full_dataset,
+                sample_size=sample_limit,
+                seed=seed,
+            )
+            run_status = "PARTIAL"
+        else:
+            dataset = full_dataset
+            run_status = "FULL"
+
         total = len(dataset)
         passed = 0
-        total_latency = 0.0
-        total_tokens = 0
-        breakdown = []
+        invalid_count = 0
+        question_results: List[QuestionResult] = []
 
         system_prompt = (
-            "You are a mathematical reasoning assistant. Solve the math problem step by step. "
-            "At the very end of your response, output '#### <number>' with the final numeric answer."
+            "You are a helpful math assistant. Solve the math word problem step by step. "
+            "At the end of your explanation, write '#### <number>' indicating your final numerical answer."
         )
+
+        total_latency_ms = 0.0
+        total_tokens = 0
 
         for idx, item in enumerate(dataset):
             if cancel_event and cancel_event.is_set():
-                break
+                raise InterruptedError("GSM8K evaluation cancelled.")
 
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": item["question"]},
-            ]
+            prompt = f"Question: {item['question']}\n\nAnswer:"
 
-            gen = backend.chat(messages, max_new_tokens=256, temperature=0.0)
-            total_latency += gen.latency_ms
+            start_t = time.perf_counter()
+            gen = backend.chat(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                max_new_tokens=512,
+                temperature=0.0,
+            )
+            latency_ms = (time.perf_counter() - start_t) * 1000.0
+            total_latency_ms += latency_ms
             total_tokens += gen.tokens_generated
 
-            extracted = extract_reasoning_answer(gen.text, item_type="numeric")
-            expected = item["expected"]
+            extracted = extract_gsm8k_answer(gen.text)
+
+            # Ground truth answer is after ####
+            expected_raw = item["answer"].split("####")[-1].strip()
+            expected_norm = normalize_numeric_string(expected_raw) or expected_raw
 
             is_correct = False
-            if extracted is not None:
-                try:
-                    is_correct = abs(float(extracted) - float(expected)) < 1e-4
-                except ValueError:
-                    is_correct = (extracted.strip() == expected.strip())
-
-            if not is_correct and expected in gen.text:
+            if extracted is None:
+                invalid_count += 1
+            elif extracted == expected_norm:
                 is_correct = True
-
-            if is_correct:
                 passed += 1
 
+            q_res = QuestionResult(
+                question_id=item["question_id"],
+                raw_prompt=prompt,
+                raw_response=gen.text,
+                extracted_answer=extracted,
+                expected_answer=expected_norm,
+                is_correct=is_correct,
+                evaluation_error=None if extracted else "Unparsable or missing final numerical answer",
+                tokens_prompt=len(prompt.split()),
+                tokens_generated=gen.tokens_generated,
+                latency_ms=round(latency_ms, 2),
+            )
+            question_results.append(q_res)
+
             if on_sample:
-                on_sample({
-                    "task_id": self.task_id,
-                    "category": self.category,
-                    "sample_index": idx + 1,
-                    "total_samples": total,
-                    "prompt": item["question"],
-                    "response": gen.text,
-                    "expected": expected,
-                    "extracted": extracted,
-                    "passed": is_correct,
-                    "latency_ms": gen.latency_ms,
-                    "tokens": gen.tokens_generated,
-                })
+                on_sample(self.task_id, idx + 1, total, is_correct)
 
-            breakdown.append({
-                "id": item["id"],
-                "expected": expected,
-                "extracted": extracted,
-                "passed": is_correct,
-            })
+        accuracy = (passed / total) * 100.0 if total > 0 else 0.0
+        ci_lower, ci_upper = wilson_score_interval(passed, total)
 
-        acc = (passed / total) if total > 0 else 0.0
-        conf = compute_metric_confidence(passed, total)
+        avg_latency = total_latency_ms / max(1, total)
+        avg_tps = (total_tokens / (total_latency_ms / 1000.0)) if total_latency_ms > 0 else 0.0
 
         return TaskMetric(
             task_id=self.task_id,
             category=self.category,
-            raw_score=round(acc, 4),
-            raw_metric_name=self.raw_metric_name,
-            normalized_score=round(acc * 100.0, 2),
+            status=run_status,
+            raw_score=round(passed / max(1, total), 4),
+            raw_metric_name="accuracy",
+            normalized_score=round(accuracy, 2),
             total_samples=total,
             passed_samples=passed,
-            avg_latency_ms=round(total_latency / max(1, total), 2),
-            avg_tokens_per_sec=round(total_tokens / max(0.001, total_latency / 1000.0), 2),
-            sub_metrics={
-                "confidence_interval": conf,
-                "details": breakdown,
-            },
+            failed_samples=total - passed,
+            invalid_responses=invalid_count,
+            ci_lower=ci_lower,
+            ci_upper=ci_upper,
+            dataset_name="openai/gsm8k",
+            dataset_revision="main",
+            split="test",
+            avg_latency_ms=round(avg_latency, 2),
+            avg_tokens_per_sec=round(avg_tps, 2),
+            question_results=question_results,
         )

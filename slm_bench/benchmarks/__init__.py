@@ -1,17 +1,18 @@
-"""Benchmarks package."""
+"""
+Official Benchmarks package for SLM-Bench.
+All custom handcrafted evaluations have been replaced with established, verifiable official benchmarks.
+"""
+
 from .base import BaseBenchmarkTask
-from .reasoning_math import ReasoningBenchmark
-from .coding_agent import CodingBenchmark
-from .instruction_following import InstructionFollowingBenchmark
-from .tool_calling import ToolCallingBenchmark
-from .suite import BenchmarkSuite, DEFAULT_CATEGORY_WEIGHTS
+from .registry import BENCHMARK_REGISTRY, EVALUATION_PROFILES, get_task, list_available_tasks, get_profile_tasks
+from .suite import BenchmarkSuite
 
 __all__ = [
     "BaseBenchmarkTask",
-    "ReasoningBenchmark",
-    "CodingBenchmark",
-    "InstructionFollowingBenchmark",
-    "ToolCallingBenchmark",
     "BenchmarkSuite",
-    "DEFAULT_CATEGORY_WEIGHTS",
+    "BENCHMARK_REGISTRY",
+    "EVALUATION_PROFILES",
+    "get_task",
+    "list_available_tasks",
+    "get_profile_tasks",
 ]

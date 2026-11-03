@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "slm-bench"
-version = "0.1.0"
-description = "Automated Evaluation Harness and GitHub Pages PR Submission System for Small Local AI"
+version = "0.2.0"
+description = "Automated Evaluation Harness for Small Local AI Using Established, Verifiable Benchmarks"
 authors = [
     { name = "Sean Dolan", email = "148463374+SeanDolan0@users.noreply.github.com" }
 ]
@@ -19,9 +19,28 @@ dependencies = [
     "pygithub>=2.1.0",
     "psutil>=5.9.0",
     "textual>=0.40.0",
+    "sympy>=1.12.0",
+    "datasets>=2.18.0",
 ]
 
 [project.optional-dependencies]
+reasoning = [
+    "datasets>=2.18.0",
+]
+math = [
+    "sympy>=1.12.0",
+    "datasets>=2.18.0",
+]
+coding = [
+    "datasets>=2.18.0",
+]
+agentic = [
+    "datasets>=2.18.0",
+]
+all-benchmarks = [
+    "datasets>=2.18.0",
+    "sympy>=1.12.0",
+]
 transformers = [
     "torch>=2.0.0",
     "transformers>=4.40.0",
@@ -39,6 +58,8 @@ test = [
     "anyio>=4.0.0",
 ]
 all = [
+    "datasets>=2.18.0",
+    "sympy>=1.12.0",
     "torch>=2.0.0",
     "transformers>=4.40.0",
     "accelerate>=0.28.0",

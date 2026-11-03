@@ -150,10 +150,17 @@
               <select id="tier-filter">
                 <option value="all">All sizes</option>
                 <option value="&lt; 3B">&lt; 3B</option>
-                <option value="3B–7B">3B &ndash; 7B</option>
-                <option value="7B–14B">7B &ndash; 14B</option>
-                <option value="14B–32B">14B &ndash; 32B</option>
-                <option value="32B+">32B+</option>
+                <option value="3B–8B">3B &ndash; 8B</option>
+                <option value="8B–14B">7B &ndash; 14B</option>
+                <option value="14B–35B">14B &ndash; 32B</option>
+                <option value="35B+">32B+</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="status-filter">Status</label>
+              <select id="status-filter">
+                <option value="official_only">Official FULL Only</option>
+                <option value="all">All Runs (Incl. Partial)</option>
               </select>
             </div>
             <div class="field">
@@ -186,14 +193,13 @@
               <label for="sort-select">Sort by</label>
               <select id="sort-select">
                 <option value="overall_desc">General (SLM-Index)</option>
-                <option value="coding_agentic_desc">Coding &amp; Agentic Index</option>
-                <option value="efficiency_desc">Local Efficiency (Score/GB)</option>
+                <option value="reasoning_desc">Reasoning (MMLU-Pro / GPQA)</option>
+                <option value="math_desc">Math (GSM8K / MATH-500)</option>
+                <option value="instruction_desc">Instruction (IFEval)</option>
+                <option value="coding_desc">Code (EvalPlus)</option>
+                <option value="tool_calling_desc">Tools (BFCL)</option>
                 <option value="speed_desc">Speed (tokens/sec)</option>
-                <option value="gsm8k_desc">Math (GSM8K)</option>
-                <option value="humaneval_desc">Code (HumanEval)</option>
-                <option value="arc_desc">Reasoning (ARC)</option>
-                <option value="ifeval_desc">Instruction (IFEval)</option>
-                <option value="tool_calling_desc">Tools (Tool use)</option>
+                <option value="efficiency_desc">Local Efficiency (Score/GB)</option>
                 <option value="params_asc">Size (smallest first)</option>
                 <option value="params_desc">Size (largest first)</option>
               </select>
@@ -216,7 +222,7 @@
                 </th>
                 <th class="col-model" scope="col" data-sort="name">
                   <span class="th-inner"><span class="th-main">Model</span><span class="sort-mark" id="sort-icon-name">&middot;</span></span>
-                  <span class="th-sub">Precision &middot; Profile</span>
+                  <span class="th-sub">Precision &middot; Status</span>
                 </th>
                 <th class="col-params" scope="col" data-sort="params">
                   <span class="th-inner"><span class="th-main">Size</span><span class="sort-mark" id="sort-icon-params">&middot;</span></span>
@@ -226,37 +232,33 @@
                   <span class="th-inner"><span class="th-main">Overall</span><span class="sort-mark is-active" id="sort-icon-overall">&darr;</span></span>
                   <span class="th-sub">SLM-Index &middot; 95% CI</span>
                 </th>
-                <th class="col-score track-col-agentic" scope="col" data-sort="coding_agentic">
-                  <span class="th-inner"><span class="th-main">Code &amp; Agent</span><span class="sort-mark" id="sort-icon-coding_agentic">&middot;</span></span>
-                  <span class="th-sub">Index</span>
+                <th class="col-score" scope="col" data-sort="reasoning">
+                  <span class="th-inner"><span class="th-main">Reasoning</span><span class="sort-mark" id="sort-icon-reasoning">&middot;</span></span>
+                  <span class="th-sub">MMLU-Pro / GPQA</span>
                 </th>
-                <th class="col-score track-col-efficiency" scope="col" data-sort="efficiency">
-                  <span class="th-inner"><span class="th-main">Score / GB</span><span class="sort-mark" id="sort-icon-efficiency">&middot;</span></span>
-                  <span class="th-sub">Efficiency</span>
+                <th class="col-score" scope="col" data-sort="math">
+                  <span class="th-inner"><span class="th-main">Math</span><span class="sort-mark" id="sort-icon-math">&middot;</span></span>
+                  <span class="th-sub">GSM8K / MATH</span>
+                </th>
+                <th class="col-score" scope="col" data-sort="instruction">
+                  <span class="th-inner"><span class="th-main">Instruction</span><span class="sort-mark" id="sort-icon-instruction">&middot;</span></span>
+                  <span class="th-sub">IFEval</span>
+                </th>
+                <th class="col-score" scope="col" data-sort="coding">
+                  <span class="th-inner"><span class="th-main">Coding</span><span class="sort-mark" id="sort-icon-coding">&middot;</span></span>
+                  <span class="th-sub">EvalPlus</span>
+                </th>
+                <th class="col-score" scope="col" data-sort="tool_calling">
+                  <span class="th-inner"><span class="th-main">Tools</span><span class="sort-mark" id="sort-icon-tool_calling">&middot;</span></span>
+                  <span class="th-sub">BFCL v4</span>
                 </th>
                 <th class="col-score" scope="col" data-sort="speed">
                   <span class="th-inner"><span class="th-main">Speed</span><span class="sort-mark" id="sort-icon-speed">&middot;</span></span>
                   <span class="th-sub">tok/s</span>
                 </th>
-                <th class="col-score" scope="col" data-sort="gsm8k">
-                  <span class="th-inner"><span class="th-main">Math</span><span class="sort-mark" id="sort-icon-gsm8k">&middot;</span></span>
-                  <span class="th-sub">GSM8K</span>
-                </th>
-                <th class="col-score" scope="col" data-sort="humaneval">
-                  <span class="th-inner"><span class="th-main">Code</span><span class="sort-mark" id="sort-icon-humaneval">&middot;</span></span>
-                  <span class="th-sub">HumanEval</span>
-                </th>
-                <th class="col-score" scope="col" data-sort="arc">
-                  <span class="th-inner"><span class="th-main">ARC</span><span class="sort-mark" id="sort-icon-arc">&middot;</span></span>
-                  <span class="th-sub">Reasoning</span>
-                </th>
-                <th class="col-score" scope="col" data-sort="ifeval">
-                  <span class="th-inner"><span class="th-main">Instruction</span><span class="sort-mark" id="sort-icon-ifeval">&middot;</span></span>
-                  <span class="th-sub">IFEval</span>
-                </th>
-                <th class="col-score" scope="col" data-sort="tool_calling">
-                  <span class="th-inner"><span class="th-main">Tools</span><span class="sort-mark" id="sort-icon-tool_calling">&middot;</span></span>
-                  <span class="th-sub">Function calls</span>
+                <th class="col-score track-col-efficiency" scope="col" data-sort="efficiency">
+                  <span class="th-inner"><span class="th-main">Score / GB</span><span class="sort-mark" id="sort-icon-efficiency">&middot;</span></span>
+                  <span class="th-sub">Efficiency</span>
                 </th>
                 <th class="col-action" scope="col">Details</th>
               </tr>

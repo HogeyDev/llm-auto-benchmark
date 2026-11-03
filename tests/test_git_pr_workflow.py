@@ -35,8 +35,9 @@ def test_generate_pr_markdown_body():
         cuda_version="13.5",
     )
     task_m = TaskMetric(
-        task_id="slm_reasoning_cot",
+        task_id="mmlu_pro",
         category="reasoning",
+        status="FULL",
         raw_score=0.9,
         raw_metric_name="accuracy",
         normalized_score=90.0,
@@ -47,16 +48,18 @@ def test_generate_pr_markdown_body():
     )
     cat_s = CategoryScore(
         category="reasoning",
-        weight=0.25,
+        weight=0.35,
         normalized_score=90.0,
         task_count=1,
     )
     result = BenchmarkResult(
-        schema_version="1.0.0",
+        schema_version="2.0.0",
         evaluation_id="test-eval-id",
+        status="FULL",
+        eligible_for_leaderboard=True,
         model=meta,
         hardware=hw,
-        tasks={"slm_reasoning_cot": task_m},
+        tasks={"mmlu_pro": task_m},
         categories={"reasoning": cat_s},
         slm_index=90.0,
     )

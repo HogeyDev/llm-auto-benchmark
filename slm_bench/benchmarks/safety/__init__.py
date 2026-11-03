@@ -1,4 +1,7 @@
-"""Safety benchmark modules."""
-from .safety_adapter import SafetyBenchmark
+"""
+Safety benchmark adapters.
+"""
 
-__all__ = ["SafetyBenchmark"]
+from .safety_adapter import SafetyBenchmark, is_model_refusal
+
+__all__ = ["SafetyBenchmark", "is_model_refusal"]

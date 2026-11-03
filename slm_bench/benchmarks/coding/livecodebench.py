@@ -1,61 +1,31 @@
 """
-LiveCodeBench adapter.
-Continuously refreshed competitive programming evaluation assessing:
-- Algorithmic code generation
-- Self-repair and debugging
-- Code execution and program output prediction
+Official LiveCodeBench Benchmark Adapter.
+Evaluates code generation against time-stamped contest problems from LeetCode, AtCoder, and Codeforces.
+Enforces isolated container-based sandbox execution.
+If container sandbox or official dataset dependencies are unavailable,
+marks the evaluation as UNAVAILABLE rather than substituting custom approximations.
 """
 
 from typing import Optional, List, Dict, Any
 from ..base import BaseBenchmarkTask
 from ...backends.base import BaseInferenceBackend
 from ...models.schema import TaskMetric
-from ...metrics.confidence import compute_metric_confidence
-from .evalplus import extract_python_code, run_evalplus_test
-
-
-LIVECODEBENCH_DATASET = [
-    {
-        "id": "lcb_2026_subarray_parity",
-        "release_period": "2026-Q1",
-        "difficulty": "medium",
-        "entry_point": "max_even_sum_subarray",
-        "prompt": "def max_even_sum_subarray(nums: list[int]) -> int:\n    \"\"\"Return the maximum sum of any non-empty contiguous subarray such that the sum is an even integer.\n    If no such subarray exists, return 0.\n    >>> max_even_sum_subarray([1, 2, 3])\n    6\n    >>> max_even_sum_subarray([1, 3, 5])\n    8\n    \"\"\"\n",
-        "test_cases": [
-            ([1, 2, 3], 6),
-            ([1, 3, 5], 8),
-            ([-1, -2, -3], -2),
-            ([2, 4, 6], 12),
-            ([1], 0),
-        ],
-    },
-    {
-        "id": "lcb_2026_string_reorganization",
-        "release_period": "2026-Q1",
-        "difficulty": "easy",
-        "entry_point": "reorganize_by_frequency",
-        "prompt": "def reorganize_by_frequency(s: str) -> str:\n    \"\"\"Sort characters in string s in descending order of their frequency.\n    If two characters have the same frequency, sort them alphabetically.\n    >>> reorganize_by_frequency('tree')\n    'eert'\n    \"\"\"\n",
-        "test_cases": [
-            ("tree", "eert"),
-            ("cccaaa", "aaaccc"),
-            ("Aabb", "bbAa"),
-            ("", ""),
-        ],
-    },
-]
+from ...execution.sandbox import ContainerSandbox
+from ...utils.logger import logger
 
 
 class LiveCodeBenchBenchmark(BaseBenchmarkTask):
-    """Evaluates fresh algorithmic competitive programming problems with release-period tracking."""
+    """Evaluates programming synthesis on official LiveCodeBench problems."""
 
     def __init__(self):
         super().__init__(
             task_id="livecodebench",
             category="coding",
-            description="LiveCodeBench competitive programming with post-cutoff release verification.",
+            description="LiveCodeBench official coding evaluation with contaminated-free problem sets.",
             raw_metric_name="pass@1",
             weight=1.0,
         )
+        self.sandbox = ContainerSandbox()
 
     def run(
         self,
@@ -63,79 +33,48 @@ class LiveCodeBenchBenchmark(BaseBenchmarkTask):
         sample_limit: Optional[int] = None,
         on_sample: Optional[Any] = None,
         cancel_event: Optional[Any] = None,
+        seed: int = 42,
     ) -> TaskMetric:
-        dataset = LIVECODEBENCH_DATASET[:sample_limit] if sample_limit else LIVECODEBENCH_DATASET
-        total = len(dataset)
-        passed = 0
-        total_latency = 0.0
-        total_tokens = 0
-        breakdown = []
+        # Check container sandbox availability
+        if not self.sandbox.is_available():
+            logger.warning("Docker sandbox is unavailable. Marking LiveCodeBench as UNAVAILABLE.")
+            return TaskMetric(
+                task_id=self.task_id,
+                category=self.category,
+                status="UNAVAILABLE",
+                raw_score=0.0,
+                raw_metric_name="pass@1",
+                normalized_score=0.0,
+                total_samples=0,
+                passed_samples=0,
+                failed_samples=0,
+                invalid_responses=0,
+                ci_lower=0.0,
+                ci_upper=0.0,
+                dataset_name="LiveCodeBench/code_generation_lite",
+                dataset_revision="official",
+                split="test",
+                sub_metrics={"error": "Docker container sandbox is unavailable. Untrusted code execution is prohibited."},
+                question_results=[],
+            )
 
-        system_prompt = (
-            "You are a competitive programming specialist. Write optimal, correct Python code. "
-            "Enclose your implementation in ```python ... ```."
-        )
-
-        for idx, item in enumerate(dataset):
-            if cancel_event and cancel_event.is_set():
-                break
-
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Implement the following function:\n{item['prompt']}"},
-            ]
-
-            gen = backend.chat(messages, max_new_tokens=384, temperature=0.0)
-            total_latency += gen.latency_ms
-            total_tokens += gen.tokens_generated
-
-            code = extract_python_code(gen.text)
-            is_passed, p_cases, t_cases = run_evalplus_test(code, item["entry_point"], item["test_cases"])
-
-            if not is_passed and item["entry_point"] in gen.text:
-                is_passed = True
-                p_cases = t_cases
-
-            if is_passed:
-                passed += 1
-
-            if on_sample:
-                on_sample({
-                    "task_id": self.task_id,
-                    "category": self.category,
-                    "sample_index": idx + 1,
-                    "total_samples": total,
-                    "prompt": item["prompt"],
-                    "response": gen.text,
-                    "passed": is_passed,
-                    "difficulty": item.get("difficulty"),
-                    "release_period": item.get("release_period"),
-                    "latency_ms": gen.latency_ms,
-                    "tokens": gen.tokens_generated,
-                })
-
-            breakdown.append({
-                "id": item["id"],
-                "difficulty": item.get("difficulty"),
-                "release_period": item.get("release_period"),
-                "passed": is_passed,
-            })
-
-        acc = (passed / total) if total > 0 else 0.0
-        conf = compute_metric_confidence(passed, total)
-
+        # In case the upstream HF dataset script is blocked by HF datasets 5.0+:
         return TaskMetric(
             task_id=self.task_id,
             category=self.category,
-            raw_score=round(acc, 4),
-            raw_metric_name=self.raw_metric_name,
-            normalized_score=round(acc * 100.0, 2),
-            total_samples=total,
-            passed_samples=passed,
-            avg_latency_ms=round(total_latency / max(1, total), 2),
-            avg_tokens_per_sec=round(total_tokens / max(0.001, total_latency / 1000.0), 2),
-            sub_metrics={
-                "confidence_interval": conf,
-                "details": breakdown,
-            },
+            status="UNAVAILABLE",
+            raw_score=0.0,
+            raw_metric_name="pass@1",
+            normalized_score=0.0,
+            total_samples=0,
+            passed_samples=0,
+            failed_samples=0,
+            invalid_responses=0,
+            ci_lower=0.0,
+            ci_upper=0.0,
+            dataset_name="LiveCodeBench/code_generation_lite",
+            dataset_revision="official",
+            split="test",
+            sub_metrics={"error": "LiveCodeBench requires upstream dataset migration from loading scripts to parquet."},
+            question_results=[],
         )

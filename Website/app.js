@@ -1,140 +1,206 @@
 /**
- * Local AI Benchmark Leaderboard - Static Client Application
- * Pure client-side JavaScript for GitHub Pages
+ * SLM-Bench Leaderboard Application (Version 2.0).
+ * Connects to data/leaderboard.json, provides interactive search, filtering by
+ * model size, status (Official FULL vs Partial), precision, and license.
+ * Visualizes official benchmarks: MMLU-Pro, GPQA Diamond, BBH, GSM8K, MATH-500, IFEval, EvalPlus, BFCL, XSTest.
  */
 
-// Application State
-let rawLeaderboardData = null;
 let allModels = [];
 let filteredModels = [];
 let selectedModelIds = new Set();
-let currentSort = { column: 'overall', direction: 'desc' };
-let currentTrack = 'all'; // 'all', 'general', 'coding_agentic', 'efficiency'
+let currentSort = { column: 'rank', direction: 'asc' };
+let rawLeaderboardData = null;
 
 let radarChartInstance = null;
 let barChartInstance = null;
 
-// Embedded Fallback Data (empty until local evaluations are recorded)
-const EMBEDDED_FALLBACK_DATA = {
-  metadata: {
-    total_models: 0,
-    last_updated: "",
-    highest_overall: 0.0,
-    best_by_benchmark: {},
-    best_by_track: {}
-  },
-  models: []
-};
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+  initApp();
+});
 
-// Markdown PR template content
-const PR_TEMPLATE_TEXT = `### What this adds
-- **Model:** org/model
-- **Profile:** standard (or quick / extended)
-- **Precision:** GGUF Q4_K_M
-- **Hardware:** NVIDIA RTX 3060 12GB / Apple M2, 16GB
-- **Result file:** \`Website/data/results/<model-slug>.json\`
-
-### Checklist
-- [ ] Open weights, and the license permits local use.
-- [ ] Ran on consumer hardware: a consumer GPU, Apple Silicon, or system RAM.
-- [ ] GPU, VRAM, CPU, RAM, OS, and telemetry (TTFT, decode TPS) recorded in the JSON.
-- [ ] Sample counts are non-zero and match the run.
-- [ ] Only the result file changed in this pull request.
-
-### Hardware & Telemetry
-| Metric | Value |
-|:--|:--|
-| GPU | NVIDIA RTX 3060 12GB |
-| CPU | AMD Ryzen 5 5600X, 6 cores |
-| System RAM | 32 GB |
-| Model Footprint | 4.8 GB RAM/VRAM |
-| Decode Speed | 65.4 tok/s |
-| TTFT | 145 ms |
-| Backend | llama.cpp |
-
-### Log tail
-\`\`\`text
-[2026-11-02 10:00:15] Model loaded
-[2026-11-02 10:11:02] Benchmark suite finished. Profile: standard. Composite SLM-Index: 82.10% (95% CI: [80.2%, 83.9%])
-\`\`\`
-`;
-
-// Initialize Application
 async function initApp() {
   setupEventListeners();
   await loadLeaderboardData();
 }
 
-// Data Fetching: tries static leaderboard.json, then falls back to results/index.json, then embedded
-async function loadLeaderboardData() {
-  try {
-    const res = await fetch('data/leaderboard.json', { cache: 'no-cache' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    rawLeaderboardData = data;
-    allModels = data.models || [];
-    console.log('[Leaderboard] Successfully fetched data/leaderboard.json with ' + allModels.length + ' models.');
-  } catch (err) {
-    console.warn('[Leaderboard] Could not load data/leaderboard.json via HTTP (likely local file:// origin or static build):', err.message);
-    try {
-      // Secondary attempt: load manifest
-      const manifestRes = await fetch('data/results/index.json', { cache: 'no-cache' });
-      if (manifestRes.ok) {
-        const manifest = await manifestRes.json();
-        const loadedModels = [];
-        for (const filename of manifest.files) {
-          try {
-            const fRes = await fetch(`data/results/${filename}`);
-            if (fRes.ok) {
-              const fData = await fRes.json();
-              loadedModels.push(normalizeEntry(fData, filename));
-            }
-          } catch (e) {}
-        }
-        if (loadedModels.length > 0) {
-          loadedModels.sort((a, b) => b.scores.overall - a.scores.overall);
-          loadedModels.forEach((m, i) => m.rank = i + 1);
-          allModels = loadedModels;
-          rawLeaderboardData = { metadata: { total_models: loadedModels.length }, models: loadedModels };
+function setupEventListeners() {
+  // Search bar
+  const searchInput = document.getElementById('search-input');
+  const clearSearchBtn = document.getElementById('clear-search-btn');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      if (clearSearchBtn) {
+        if (e.target.value.trim().length > 0) {
+          clearSearchBtn.classList.remove('hidden');
+        } else {
+          clearSearchBtn.classList.add('hidden');
         }
       }
-    } catch (e2) {}
+      applyFiltersAndSort();
+    });
+  }
 
-    // Fallback to embedded data if still empty
-    if (!allModels || allModels.length === 0) {
-      console.log('[Leaderboard] Using embedded benchmark dataset.');
-      rawLeaderboardData = EMBEDDED_FALLBACK_DATA;
-      allModels = EMBEDDED_FALLBACK_DATA.models;
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
+      if (searchInput) {
+        searchInput.value = '';
+        clearSearchBtn.classList.add('hidden');
+        applyFiltersAndSort();
+      }
+    });
+  }
+
+  // Filters
+  const tierFilter = document.getElementById('tier-filter');
+  const statusFilter = document.getElementById('status-filter');
+  const profileFilter = document.getElementById('profile-filter');
+  const quantFilter = document.getElementById('quant-filter');
+  const licenseFilter = document.getElementById('license-filter');
+  const sortSelect = document.getElementById('sort-select');
+
+  [tierFilter, statusFilter, profileFilter, quantFilter, licenseFilter].forEach(el => {
+    if (el) el.addEventListener('change', () => applyFiltersAndSort());
+  });
+
+  if (sortSelect) {
+    sortSelect.addEventListener('change', (e) => {
+      const [col, dir] = e.target.value.split('_');
+      currentSort = { column: col, direction: dir || 'desc' };
+      applyFiltersAndSort();
+    });
+  }
+
+  // Reset Filters button
+  const resetBtn = document.getElementById('reset-filters-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (searchInput) searchInput.value = '';
+      if (clearSearchBtn) clearSearchBtn.classList.add('hidden');
+      if (tierFilter) tierFilter.value = 'all';
+      if (statusFilter) statusFilter.value = 'official_only';
+      if (profileFilter) profileFilter.value = 'all';
+      if (quantFilter) quantFilter.value = 'all';
+      if (licenseFilter) licenseFilter.value = 'all';
+      if (sortSelect) sortSelect.value = 'overall_desc';
+      currentSort = { column: 'rank', direction: 'asc' };
+      applyFiltersAndSort();
+    });
+  }
+
+  // Table header click-to-sort
+  const headers = document.querySelectorAll('#leaderboard-table th[data-sort]');
+  headers.forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.getAttribute('data-sort');
+      if (currentSort.column === col) {
+        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSort.column = col;
+        currentSort.direction = (col === 'rank' || col === 'name' || col === 'params') ? 'asc' : 'desc';
+      }
+      applyFiltersAndSort();
+    });
+  });
+
+  // Modal close buttons
+  setupModalDismiss();
+
+  // Export buttons
+  const csvBtn = document.getElementById('export-csv-btn');
+  const jsonBtn = document.getElementById('export-json-btn');
+  if (csvBtn) csvBtn.addEventListener('click', exportCSV);
+  if (jsonBtn) jsonBtn.addEventListener('click', exportJSON);
+}
+
+// Data Fetching
+async function loadLeaderboardData() {
+  const countText = document.getElementById('results-count-text');
+  if (countText) countText.textContent = "Loading benchmarks...";
+
+  try {
+    const res = await fetch('data/leaderboard.json');
+    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+    rawLeaderboardData = await res.json();
+    
+    // Process models
+    if (rawLeaderboardData && Array.isArray(rawLeaderboardData.models)) {
+      allModels = rawLeaderboardData.models;
+    } else {
+      allModels = [];
+    }
+
+    populateLicenseFilter();
+    updateStatCards();
+    applyFiltersAndSort();
+    renderCharts();
+  } catch (err) {
+    console.warn("Could not load data/leaderboard.json directly, searching results...", err);
+    await loadDirectResults();
+  }
+}
+
+async function loadDirectResults() {
+  const resultFiles = [
+    'spark-x2.6-4b-int4.json',
+    'llama-3.2-3b-bf16.json',
+    'qwen2.5-3b-instruct-bf16.json',
+    'phi-3.5-mini-bf16.json'
+  ];
+
+  const loaded = [];
+  for (const f of resultFiles) {
+    try {
+      const res = await fetch(`data/results/${f}`);
+      if (res.ok) {
+        const data = await res.json();
+        loaded.push(normalizeEntry(data, f));
+      }
+    } catch (e) {
+      // ignore
     }
   }
 
-  // Populate dynamic UI elements
+  allModels = loaded;
   populateLicenseFilter();
-  populateProfileFilter();
-  updateTopStats();
+  updateStatCards();
   applyFiltersAndSort();
   renderCharts();
-  loadPRTemplate();
 }
 
 function normalizeEntry(data, filename) {
   const model = data.model || {};
-  const summary = data.summary_scores || {};
   const tasks = data.tasks || {};
+  const categories = data.categories || {};
   const hw = data.hardware || {};
   const telem = data.telemetry || hw.telemetry || {};
 
-  const gsm8k = summary.gsm8k || tasks.gsm8k?.score || tasks.gsm8k?.normalized_score || 0;
-  const humaneval = summary.humaneval || tasks.humaneval?.score || tasks.humaneval?.normalized_score || tasks.slm_coding_agent?.normalized_score || tasks.slm_agentic_coding?.normalized_score || 0;
-  const arc = summary.arc || tasks.arc?.score || tasks.arc?.normalized_score || tasks.slm_reasoning_cot?.normalized_score || 0;
-  const ifeval = summary.ifeval || tasks.ifeval?.score || tasks.ifeval?.normalized_score || tasks.slm_instruction_ifeval?.normalized_score || tasks.slm_instruction_following?.normalized_score || 0;
-  const tool_calling = summary.tool_calling || tasks.tool_calling?.score || tasks.tool_calling?.normalized_score || tasks.slm_tool_calling_multiturn?.normalized_score || 0;
-  const overall = data.slm_index || summary.overall_score || ((gsm8k * 0.25) + (humaneval * 0.30) + (arc * 0.20) + (ifeval * 0.15) + (tool_calling * 0.10));
+  const isLegacy = data.is_legacy || false;
+  const status = isLegacy ? "INVALID" : (data.status || "FULL");
+  const eligible = isLegacy ? false : (data.eligible_for_leaderboard !== undefined ? data.eligible_for_leaderboard : (status === "FULL"));
 
-  const modelRam = hw.model_ram_gb || model.model_ram_gb || data.model_ram_gb || (model.param_count_b ? (model.param_count_b * 0.65) : null);
-  const coding_agentic = data.coding_agentic_index || (0.60 * humaneval + 0.40 * tool_calling);
+  // Canonical Official Benchmarks
+  const mmlu_pro = tasks.mmlu_pro?.normalized_score || null;
+  const gpqa = tasks.gpqa_diamond?.normalized_score || tasks.gpqa?.normalized_score || null;
+  const bbh = tasks.bbh?.normalized_score || null;
+  const gsm8k = tasks.gsm8k?.normalized_score || null;
+  const math500 = tasks.math500?.normalized_score || null;
+  const ifeval = tasks.ifeval?.normalized_score || null;
+  const evalplus = tasks.evalplus?.normalized_score || tasks.evalplus_humanevalplus?.normalized_score || null;
+  const bfcl = tasks.bfcl?.normalized_score || null;
+  const xstest = tasks.xstest?.normalized_score || tasks.safety?.normalized_score || null;
+
+  // Category Pillars
+  const reasoning = categories.reasoning?.normalized_score || (mmlu_pro || gpqa || 0);
+  const math = categories.mathematics?.normalized_score || (gsm8k || math500 || 0);
+  const instruction = categories.instruction?.normalized_score || (ifeval || 0);
+  const coding = categories.coding?.normalized_score || (evalplus || null);
+  const tool_calling = categories.tool_calling?.normalized_score || (bfcl || null);
+
+  const overall = data.slm_index || 0.0;
+  const modelRam = hw.model_ram_gb || model.model_ram_gb || data.model_ram_gb || (model.param_count_b ? (model.param_count_b * 0.65) : 8.0);
   const score_per_gb = modelRam ? parseFloat((overall / Math.max(1.0, modelRam)).toFixed(2)) : 0.0;
-  const tps = telem.decode_tok_per_sec || data.avg_tokens_per_sec || summary.avg_tokens_per_sec || 0.0;
+  const tps = telem.decode_tok_per_sec || data.avg_tokens_per_sec || 0.0;
 
   return {
     filename: filename,
@@ -142,33 +208,45 @@ function normalizeEntry(data, filename) {
     evaluation_id: data.evaluation_id || "eval-" + Math.random().toString(36).substring(7),
     timestamp: data.timestamp || new Date().toISOString(),
     profile: data.profile || "standard",
-    submitter: data.submitter || { name: "Community Contributor", github_handle: "open-source" },
+    status: status,
+    eligible_for_leaderboard: eligible,
+    is_legacy: isLegacy,
+    submitter: data.submitter || { name: "Open Contributor", github_handle: "community" },
     model: {
       model_id: model.model_id || "Unknown",
       model_slug: model.model_slug || (model.model_id || "").replace('/', '-'),
       hf_url: model.hf_url || `https://huggingface.co/${model.model_id}`,
       param_count_b: parseFloat(model.param_count_b || 0),
-      param_tier: model.param_tier || "7B–14B",
-      architecture: model.architecture || "CausalLM",
+      param_tier: model.param_tier || "3B–8B",
+      architecture: model.architecture || "Transformer",
       quantization: model.quantization || "BF16",
       model_ram_gb: modelRam,
       context_length: model.context_length || 32768,
       license: model.license || "Open",
       backend: model.backend || "transformers",
-      reasoning_effort: model.reasoning_effort
+      reasoning_effort: model.reasoning_effort,
     },
     scores: {
       overall: parseFloat(overall.toFixed(2)),
-      ci_lower: data.ci_lower || Math.max(0, parseFloat((overall - 2.8).toFixed(1))),
-      ci_upper: data.ci_upper || Math.min(100, parseFloat((overall + 2.8).toFixed(1))),
-      coding_agentic_index: parseFloat(coding_agentic.toFixed(2)),
+      ci_lower: data.ci_lower || null,
+      ci_upper: data.ci_upper || null,
+      coding_agentic: data.coding_agentic_index || null,
       score_per_gb: score_per_gb,
       speed: parseFloat(tps.toFixed(1)),
-      gsm8k: parseFloat(gsm8k.toFixed(2)),
-      humaneval: parseFloat(humaneval.toFixed(2)),
-      arc: parseFloat(arc.toFixed(2)),
-      ifeval: parseFloat(ifeval.toFixed(2)),
-      tool_calling: parseFloat(tool_calling.toFixed(2))
+      reasoning: reasoning ? parseFloat(reasoning.toFixed(2)) : null,
+      mathematics: math ? parseFloat(math.toFixed(2)) : null,
+      instruction: instruction ? parseFloat(instruction.toFixed(2)) : null,
+      coding: coding !== null ? parseFloat(coding.toFixed(2)) : null,
+      tool_calling: tool_calling !== null ? parseFloat(tool_calling.toFixed(2)) : null,
+      mmlu_pro: mmlu_pro,
+      gpqa_diamond: gpqa,
+      bbh: bbh,
+      gsm8k: gsm8k,
+      math500: math500,
+      ifeval: ifeval,
+      evalplus: evalplus,
+      bfcl: bfcl,
+      xstest: xstest,
     },
     hardware: hw,
     telemetry: {
@@ -176,16 +254,14 @@ function normalizeEntry(data, filename) {
       decode_tok_per_sec: tps,
       tpot_ms: telem.tpot_ms || 0,
       peak_ram_mb: telem.peak_ram_mb || 0,
-      peak_vram_mb: telem.peak_vram_mb || 0
+      peak_vram_mb: telem.peak_vram_mb || 0,
     },
-    categories: data.categories || {},
+    categories: categories,
     tasks: tasks,
     notes: data.notes || "",
-    raw_logs_preview: data.raw_logs_preview || data.notes || "Evaluation completed."
   };
 }
 
-// Populate Filter Dropdowns dynamically
 function populateLicenseFilter() {
   const licenseSelect = document.getElementById('license-filter');
   if (!licenseSelect) return;
@@ -203,83 +279,37 @@ function populateLicenseFilter() {
   });
 }
 
-function populateProfileFilter() {
-  const profileSelect = document.getElementById('profile-filter');
-  if (!profileSelect) return;
-  const profiles = new Set(['standard', 'quick', 'extended']);
-  allModels.forEach(m => {
-    if (m.profile) profiles.add(m.profile.toLowerCase());
-  });
-
-  profileSelect.innerHTML = '<option value="all">All profiles</option>';
-  Array.from(profiles).sort().forEach(prof => {
-    const opt = document.createElement('option');
-    opt.value = prof;
-    opt.textContent = prof.charAt(0).toUpperCase() + prof.slice(1);
-    profileSelect.appendChild(opt);
-  });
-}
-
-// Update Top Metric Stat Cards
-function updateTopStats() {
+function updateStatCards() {
   const modelCountEl = document.getElementById('stat-model-count');
-  const topScoreEl = document.getElementById('stat-top-score');
   const topModelEl = document.getElementById('stat-top-model');
-  const topCodingEl = document.getElementById('stat-top-coding');
-  const topCodingModelEl = document.getElementById('stat-top-coding-model');
-  const topEfficiencyEl = document.getElementById('stat-top-efficiency');
-  const topEfficiencyModelEl = document.getElementById('stat-top-efficiency-model');
+  const topScoreEl = document.getElementById('stat-top-score');
   const topSpeedEl = document.getElementById('stat-top-speed');
   const topSpeedModelEl = document.getElementById('stat-top-speed-model');
-  const updatedDateEl = document.getElementById('last-updated-text');
 
-  if (!allModels || allModels.length === 0) {
-    if (modelCountEl) modelCountEl.textContent = '0';
-    if (topScoreEl) topScoreEl.textContent = '—';
-    if (topModelEl) topModelEl.textContent = '—';
-    if (topCodingEl) topCodingEl.textContent = '—';
-    if (topCodingModelEl) topCodingModelEl.textContent = '—';
-    if (topEfficiencyEl) topEfficiencyEl.textContent = '—';
-    if (topEfficiencyModelEl) topEfficiencyModelEl.textContent = '—';
-    if (topSpeedEl) topSpeedEl.textContent = '—';
-    if (topSpeedModelEl) topSpeedModelEl.textContent = '—';
-    if (updatedDateEl) updatedDateEl.textContent = '—';
-    return;
+  const eligibleModels = allModels.filter(m => m.eligible_for_leaderboard);
+  const displayCount = eligibleModels.length > 0 ? eligibleModels.length : allModels.length;
+
+  if (modelCountEl) modelCountEl.textContent = displayCount;
+
+  if (eligibleModels.length > 0) {
+    const sorted = [...eligibleModels].sort((a, b) => b.scores.overall - a.scores.overall);
+    const top = sorted[0];
+    if (topModelEl) topModelEl.textContent = top.model.model_id;
+    if (topScoreEl) topScoreEl.textContent = `${top.scores.overall.toFixed(1)}%`;
   }
 
-  modelCountEl.textContent = allModels.length;
-
-  // 1. Top General (SLM-Index)
-  const topOverall = allModels.reduce((prev, cur) => (cur.scores.overall > prev.scores.overall) ? cur : prev, allModels[0]);
-  topScoreEl.textContent = topOverall.scores.overall.toFixed(1) + '%';
-  topModelEl.textContent = topOverall.model.model_id;
-
-  // 2. Top Coding & Agentic
-  const topCoding = allModels.reduce((prev, cur) => ((cur.scores.coding_agentic_index || 0) > (prev.scores.coding_agentic_index || 0)) ? cur : prev, allModels[0]);
-  topCodingEl.textContent = (topCoding.scores.coding_agentic_index || 0).toFixed(1) + '%';
-  topCodingModelEl.textContent = topCoding.model.model_id;
-
-  // 3. Top Efficiency (Score / GB)
-  const topEfficiency = allModels.reduce((prev, cur) => ((cur.scores.score_per_gb || 0) > (prev.scores.score_per_gb || 0)) ? cur : prev, allModels[0]);
-  if (topEfficiencyEl) {
-    topEfficiencyEl.textContent = (topEfficiency.scores.score_per_gb || 0).toFixed(1) + ' / GB';
-    topEfficiencyModelEl.textContent = topEfficiency.model.model_id;
+  if (allModels.length > 0) {
+    const topSpeed = allModels.reduce((prev, cur) => {
+      const spdCur = cur.telemetry?.decode_tok_per_sec || cur.scores?.speed || 0;
+      const spdPrev = prev.telemetry?.decode_tok_per_sec || prev.scores?.speed || 0;
+      return spdCur > spdPrev ? cur : prev;
+    }, allModels[0]);
+    if (topSpeedEl) {
+      const spdVal = topSpeed.telemetry?.decode_tok_per_sec || topSpeed.scores?.speed || 0;
+      topSpeedEl.textContent = spdVal.toFixed(1) + ' tok/s';
+      if (topSpeedModelEl) topSpeedModelEl.textContent = topSpeed.model.model_id;
+    }
   }
-
-  // 4. Top Throughput (TPS)
-  const topSpeed = allModels.reduce((prev, cur) => {
-    const spdCur = cur.telemetry?.decode_tok_per_sec || cur.scores?.speed || 0;
-    const spdPrev = prev.telemetry?.decode_tok_per_sec || prev.scores?.speed || 0;
-    return spdCur > spdPrev ? cur : prev;
-  }, allModels[0]);
-  if (topSpeedEl) {
-    const spdVal = topSpeed.telemetry?.decode_tok_per_sec || topSpeed.scores?.speed || 0;
-    topSpeedEl.textContent = spdVal.toFixed(1) + ' tok/s';
-    topSpeedModelEl.textContent = topSpeed.model.model_id;
-  }
-
-  const updatedDate = rawLeaderboardData?.metadata?.last_updated ? new Date(rawLeaderboardData.metadata.last_updated).toLocaleDateString() : 'Recently';
-  if (updatedDateEl) updatedDateEl.textContent = updatedDate;
 }
 
 // Filter and Sort Engine
@@ -287,14 +317,19 @@ function applyFiltersAndSort() {
   const searchInput = document.getElementById('search-input');
   const searchTerm = (searchInput?.value || '').trim().toLowerCase();
   const tierFilter = document.getElementById('tier-filter')?.value || 'all';
+  const statusFilter = document.getElementById('status-filter')?.value || 'official_only';
   const profileFilter = document.getElementById('profile-filter')?.value || 'all';
   const licenseFilter = document.getElementById('license-filter')?.value || 'all';
   const quantFilter = document.getElementById('quant-filter')?.value || 'all';
 
   filteredModels = allModels.filter(item => {
     const m = item.model || {};
-    const sub = item.submitter || {};
     const prof = (item.profile || 'standard').toLowerCase();
+
+    // Status filter: only official FULL runs vs all runs
+    if (statusFilter === 'official_only') {
+      if (!item.eligible_for_leaderboard) return false;
+    }
 
     // Search filter
     if (searchTerm) {
@@ -302,12 +337,8 @@ function applyFiltersAndSort() {
         (m.model_id || '').toLowerCase().includes(searchTerm) ||
         (m.model_slug || '').toLowerCase().includes(searchTerm) ||
         (m.architecture || '').toLowerCase().includes(searchTerm) ||
-        (m.license || '').toLowerCase().includes(searchTerm) ||
         (m.backend || '').toLowerCase().includes(searchTerm) ||
-        (m.quantization || '').toLowerCase().includes(searchTerm) ||
-        prof.includes(searchTerm) ||
-        (sub.name || '').toLowerCase().includes(searchTerm) ||
-        (sub.github_handle || '').toLowerCase().includes(searchTerm)
+        (m.quantization || '').toLowerCase().includes(searchTerm)
       );
       if (!match) return false;
     }
@@ -316,10 +347,10 @@ function applyFiltersAndSort() {
     if (tierFilter !== 'all') {
       const p = m.param_count_b || 0;
       if (tierFilter === '< 3B' && p >= 3.0) return false;
-      if (tierFilter === '3B–7B' && (p < 3.0 || p > 7.0)) return false;
-      if (tierFilter === '7B–14B' && (p <= 7.0 || p > 14.0)) return false;
-      if (tierFilter === '14B–32B' && (p <= 14.0 || p > 32.0)) return false;
-      if (tierFilter === '32B+' && p <= 32.0) return false;
+      if (tierFilter === '3B–8B' && (p < 3.0 || p > 8.0)) return false;
+      if (tierFilter === '8B–14B' && (p <= 8.0 || p > 14.0)) return false;
+      if (tierFilter === '14B–35B' && (p <= 14.0 || p > 35.0)) return false;
+      if (tierFilter === '35B+' && p <= 35.0) return false;
     }
 
     // Profile filter
@@ -345,7 +376,6 @@ function applyFiltersAndSort() {
     return true;
   });
 
-  // Sort
   sortModels(currentSort.column, currentSort.direction);
   renderTable();
   updateCompareDock();
@@ -357,8 +387,8 @@ function sortModels(column, direction) {
 
     switch (column) {
       case 'rank':
-        valA = a.rank || 0;
-        valB = b.rank || 0;
+        valA = a.rank && a.rank !== '-' ? a.rank : 9999;
+        valB = b.rank && b.rank !== '-' ? b.rank : 9999;
         break;
       case 'name':
         valA = a.model.model_id.toLowerCase();
@@ -369,44 +399,40 @@ function sortModels(column, direction) {
         valB = b.model.param_count_b || 0;
         break;
       case 'overall':
-        valA = a.scores.overall;
-        valB = b.scores.overall;
+        valA = a.scores.overall || 0;
+        valB = b.scores.overall || 0;
         break;
-      case 'coding_agentic':
-        valA = a.scores.coding_agentic_index || 0;
-        valB = b.scores.coding_agentic_index || 0;
+      case 'reasoning':
+        valA = a.scores.reasoning || a.scores.mmlu_pro || 0;
+        valB = b.scores.reasoning || b.scores.mmlu_pro || 0;
         break;
-      case 'efficiency':
-        valA = a.scores.score_per_gb || a.local_efficiency?.score_per_gb || 0;
-        valB = b.scores.score_per_gb || b.local_efficiency?.score_per_gb || 0;
+      case 'math':
+        valA = a.scores.mathematics || a.scores.gsm8k || 0;
+        valB = b.scores.mathematics || b.scores.gsm8k || 0;
+        break;
+      case 'instruction':
+        valA = a.scores.instruction || a.scores.ifeval || 0;
+        valB = b.scores.instruction || b.scores.ifeval || 0;
+        break;
+      case 'coding':
+        valA = a.scores.coding || a.scores.evalplus || 0;
+        valB = b.scores.coding || b.scores.evalplus || 0;
+        break;
+      case 'tool_calling':
+        valA = a.scores.tool_calling || a.scores.bfcl || 0;
+        valB = b.scores.tool_calling || b.scores.bfcl || 0;
         break;
       case 'speed':
         valA = a.telemetry?.decode_tok_per_sec || a.scores?.speed || 0;
         valB = b.telemetry?.decode_tok_per_sec || b.scores?.speed || 0;
         break;
-      case 'gsm8k':
-        valA = a.scores.gsm8k;
-        valB = b.scores.gsm8k;
-        break;
-      case 'humaneval':
-        valA = a.scores.humaneval;
-        valB = b.scores.humaneval;
-        break;
-      case 'arc':
-        valA = a.scores.arc;
-        valB = b.scores.arc;
-        break;
-      case 'ifeval':
-        valA = a.scores.ifeval;
-        valB = b.scores.ifeval;
-        break;
-      case 'tool_calling':
-        valA = a.scores.tool_calling;
-        valB = b.scores.tool_calling;
+      case 'efficiency':
+        valA = a.scores.score_per_gb || 0;
+        valB = b.scores.score_per_gb || 0;
         break;
       default:
-        valA = a.scores.overall;
-        valB = b.scores.overall;
+        valA = a.scores.overall || 0;
+        valB = b.scores.overall || 0;
     }
 
     if (valA < valB) return direction === 'asc' ? -1 : 1;
@@ -415,17 +441,16 @@ function sortModels(column, direction) {
   });
 }
 
-// Render Leaderboard Table
 function renderTable() {
   const tbody = document.getElementById('table-body');
   const countText = document.getElementById('results-count-text');
   tbody.innerHTML = '';
 
   if (allModels.length === 0) {
-    countText.textContent = `0 models`;
+    if (countText) countText.textContent = `0 models`;
     tbody.innerHTML = `
       <tr>
-        <td colspan="14">
+        <td colspan="13">
           <div class="empty-state">
             <strong>No benchmarks recorded yet</strong>
             <span>Run <code>slm-bench evaluate</code> to generate benchmark results.</span>
@@ -436,15 +461,15 @@ function renderTable() {
     return;
   }
 
-  countText.textContent = `Showing ${filteredModels.length} of ${allModels.length} models`;
+  if (countText) countText.textContent = `Showing ${filteredModels.length} of ${allModels.length} models`;
 
   if (filteredModels.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="14">
+        <td colspan="13">
           <div class="empty-state">
             <strong>No matching models</strong>
-            <span>Try adjusting your search query or filter selections.</span>
+            <span>Try adjusting your filter options (e.g. switch status from "Official FULL Only" to "All Runs").</span>
           </div>
         </td>
       </tr>
@@ -458,33 +483,40 @@ function renderTable() {
     const telem = item.telemetry || {};
     const isSelected = selectedModelIds.has(m.model_slug || m.model_id);
     const prof = item.profile || 'standard';
+    const status = item.status || 'FULL';
 
     const tr = document.createElement('tr');
     tr.className = `model-row${isSelected ? ' is-selected' : ''}`;
     
-    // Clicking anywhere on row (except checkbox & link) opens modal
     tr.onclick = (e) => {
       if (e.target.closest('.no-modal-click')) return;
       showModelModal(item);
     };
 
-    // Rank marker
     let rankBadge = `<span class="rank">${item.rank || (index + 1)}</span>`;
     if (item.rank === 1 || item.rank === 2 || item.rank === 3) {
       rankBadge = `<span class="rank rank--${item.rank}">${item.rank}</span>`;
     }
 
-    // Score colour ramp
     const getScoreBadge = (score) => {
+      if (score === null || score === undefined) return '<span style="color:#64748b;">—</span>';
       let colorClass = 'score-val--low';
-      if (score >= 80) colorClass = 'score-val--high';
-      else if (score >= 70) colorClass = 'score-val--mid';
+      if (score >= 75) colorClass = 'score-val--high';
+      else if (score >= 60) colorClass = 'score-val--mid';
       return `<span class="score-val ${colorClass}">${score.toFixed(1)}%</span>`;
     };
 
+    let statusTag = '';
+    if (item.is_legacy) {
+      statusTag = '<span class="tag" style="background:#374151;color:#9ca3af;" title="Deprecated custom benchmark record">DEPRECATED</span>';
+    } else if (status === 'FULL') {
+      statusTag = '<span class="tag" style="background:#065f46;color:#a7f3d0;" title="Complete official evaluation split">FULL</span>';
+    } else {
+      statusTag = '<span class="tag" style="background:#854d0e;color:#fef08a;" title="Sampled evaluation — ineligible for full leaderboard">PARTIAL</span>';
+    }
+
     const speedVal = telem.decode_tok_per_sec || s.speed || 0;
     const effVal = s.score_per_gb || (m.model_ram_gb ? (s.overall / m.model_ram_gb).toFixed(1) : 0);
-    const agenticVal = s.coding_agentic_index || (0.60 * s.humaneval + 0.40 * s.tool_calling);
 
     tr.innerHTML = `
       <td class="col-check no-modal-click" onclick="event.stopPropagation()">
@@ -495,18 +527,16 @@ function renderTable() {
       <td class="col-rank cell-rank">${rankBadge}</td>
       <td class="col-model">
         <a href="${m.hf_url}" target="_blank" rel="noopener noreferrer"
-          class="model-link no-modal-click" title="Open the model card on Hugging Face"
+          class="model-link no-modal-click" title="Open model on Hugging Face"
           onclick="event.stopPropagation()">
           <span class="truncate">${m.model_id}</span>
           <span class="model-arrow">&#8599;</span>
         </a>
         <div class="model-meta">
-          <span class="tag tag--profile-${prof}">${prof}</span>
+          ${statusTag}
           <span class="tag tag--quant">${m.quantization}</span>
+          <span class="tag">${m.backend}</span>
           <span class="tag">${m.architecture}</span>
-          <span class="tag">${m.license}</span>
-          ${m.reasoning_effort ? `<span class="tag tag--effort">effort:${m.reasoning_effort}</span>` : ''}
-          ${item.notes ? `<span class="tag tag--notes">notes</span>` : ''}
         </div>
       </td>
       <td class="col-params">
@@ -515,32 +545,29 @@ function renderTable() {
       </td>
       <td class="col-overall">
         <span class="score-overall">${s.overall.toFixed(1)}%</span>
-        ${s.ci_lower ? `<span class="ci-range">[${s.ci_lower.toFixed(1)}, ${s.ci_upper.toFixed(1)}]</span>` : ''}
+        ${s.ci_lower ? `<span class="ci-range">[${s.ci_lower.toFixed(1)}%, ${s.ci_upper.toFixed(1)}%]</span>` : ''}
       </td>
-      <td class="col-score track-col-agentic">${getScoreBadge(agenticVal)}</td>
-      <td class="col-score track-col-efficiency">
-        <span class="score-val ${effVal >= 15 ? 'score-val--high' : 'score-val--mid'}">${typeof effVal === 'number' ? effVal.toFixed(1) : effVal}</span>
-      </td>
+      <td class="col-score">${getScoreBadge(s.reasoning)}</td>
+      <td class="col-score">${getScoreBadge(s.mathematics)}</td>
+      <td class="col-score">${getScoreBadge(s.instruction)}</td>
+      <td class="col-score">${getScoreBadge(s.coding)}</td>
+      <td class="col-score">${getScoreBadge(s.tool_calling)}</td>
       <td class="col-score">
         <span class="score-val ${speedVal >= 60 ? 'score-val--high' : 'score-val--mid'}">${speedVal ? speedVal.toFixed(1) : '—'}</span>
       </td>
-      <td class="col-score">${getScoreBadge(s.gsm8k)}</td>
-      <td class="col-score">${getScoreBadge(s.humaneval)}</td>
-      <td class="col-score">${getScoreBadge(s.arc)}</td>
-      <td class="col-score">${getScoreBadge(s.ifeval)}</td>
-      <td class="col-score">${getScoreBadge(s.tool_calling)}</td>
+      <td class="col-score track-col-efficiency">
+        <span class="score-val ${effVal >= 10 ? 'score-val--high' : 'score-val--mid'}">${typeof effVal === 'number' ? effVal.toFixed(1) : effVal}</span>
+      </td>
       <td class="col-action no-modal-click" onclick="event.stopPropagation()">
         <button type="button" class="icon-btn inspect-btn" title="Open the full run record" aria-label="Inspect ${m.model_id}">&rarr;</button>
       </td>
     `;
 
-    // Connect row inspect button
     tr.querySelector('.inspect-btn').onclick = (e) => {
       e.stopPropagation();
       showModelModal(item);
     };
 
-    // Connect checkbox
     const cb = tr.querySelector('.model-select-cb');
     cb.onchange = (e) => {
       const id = e.target.getAttribute('data-id');
@@ -562,7 +589,6 @@ function renderTable() {
   });
 }
 
-// Update Compare Floating Dock & Nav Indicator
 function updateCompareDock() {
   const dock = document.getElementById('compare-dock');
   const countSpan = document.getElementById('dock-count');
@@ -586,155 +612,70 @@ function updateCompareDock() {
   }
 }
 
-// Show Model Inspector Modal
 function showModelModal(item) {
   const modal = document.getElementById('model-modal');
+  if (!modal) return;
   const m = item.model;
   const s = item.scores;
   const hw = item.hardware || {};
   const tasks = item.tasks || {};
   const telem = item.telemetry || {};
-  const prof = item.profile || 'standard';
 
   document.getElementById('modal-rank-badge').textContent = `Rank #${item.rank || '--'}`;
   document.getElementById('modal-tier-badge').textContent = m.param_tier || `${m.param_count_b}B`;
   document.getElementById('modal-quant-badge').textContent = m.quantization || 'BF16';
   document.getElementById('modal-model-title').textContent = m.model_id;
-  
+
   const profileBadge = document.getElementById('modal-profile-badge');
   if (profileBadge) {
-    profileBadge.textContent = prof.toUpperCase();
-    profileBadge.className = `chip tag--profile-${prof}`;
-  }
-
-  const effortBadge = document.getElementById('modal-effort-badge');
-  if (effortBadge) {
-    if (m.reasoning_effort) {
-      effortBadge.textContent = `Effort: ${m.reasoning_effort}`;
-      effortBadge.classList.remove('hidden');
-    } else {
-      effortBadge.classList.add('hidden');
-    }
+    profileBadge.textContent = (item.status || "FULL").toUpperCase();
+    profileBadge.className = `chip ${item.status === 'FULL' ? 'tag--profile-standard' : 'tag--profile-quick'}`;
   }
 
   const hfLink = document.getElementById('modal-hf-link');
-  hfLink.href = m.hf_url;
-  
+  if (hfLink) hfLink.href = m.hf_url;
+
   document.getElementById('modal-eval-id').textContent = `ID: ${item.evaluation_id}`;
   document.getElementById('modal-score-overall').textContent = `${s.overall.toFixed(2)}%`;
-  
+
   const ciRangeEl = document.getElementById('modal-ci-range');
   if (ciRangeEl) {
-    if (s.ci_lower !== undefined && s.ci_upper !== undefined) {
-      ciRangeEl.textContent = `95% CI: [${s.ci_lower.toFixed(1)}%, ${s.ci_upper.toFixed(1)}%]`;
+    if (s.ci_lower !== null && s.ci_upper !== null) {
+      ciRangeEl.textContent = `95% Wilson CI: [${s.ci_lower.toFixed(1)}%, ${s.ci_upper.toFixed(1)}%]`;
     } else {
-      ciRangeEl.textContent = `95% CI: --`;
+      ciRangeEl.textContent = `95% CI: N/A`;
     }
-  }
-
-  const agenticScoreEl = document.getElementById('modal-score-agentic');
-  if (agenticScoreEl) {
-    const agScore = s.coding_agentic_index || (0.60 * s.humaneval + 0.40 * s.tool_calling);
-    agenticScoreEl.textContent = `${agScore.toFixed(1)}%`;
-  }
-
-  const efficiencyScoreEl = document.getElementById('modal-score-efficiency');
-  if (efficiencyScoreEl) {
-    const eff = s.score_per_gb || (m.model_ram_gb ? (s.overall / m.model_ram_gb).toFixed(1) : '--');
-    efficiencyScoreEl.textContent = `${eff}`;
   }
 
   const throughputEl = document.getElementById('modal-throughput');
   if (throughputEl) {
     const spd = telem.decode_tok_per_sec || s.speed || 0;
-    throughputEl.textContent = spd ? `${spd.toFixed(1)} t/s` : 'N/A';
+    throughputEl.textContent = spd ? `${spd.toFixed(1)} tok/s` : 'N/A';
   }
 
   document.getElementById('modal-param-count').textContent = `${m.param_count_b || 'N/A'}B`;
-
   const modelRam = m.model_ram_gb || hw.model_ram_gb;
   document.getElementById('modal-model-ram').textContent = modelRam ? `${modelRam.toFixed(1)} GB` : 'N/A';
-  document.getElementById('modal-hw-model-ram').textContent = modelRam ? `${modelRam.toFixed(2)} GB RAM/VRAM` : 'N/A';
-
-  // Notes section
-  const notesContainer = document.getElementById('modal-notes-section');
-  const notesText = document.getElementById('modal-notes-text');
-  if (item.notes && item.notes.trim()) {
-    notesText.textContent = item.notes;
-    notesContainer.classList.remove('hidden');
-  } else {
-    notesContainer.classList.add('hidden');
-  }
-
-  // Submitter details
-  document.getElementById('modal-sub-name').textContent = item.submitter?.name || 'Open Contributor';
-  document.getElementById('modal-sub-github').textContent = item.submitter?.github_handle ? `@${item.submitter.github_handle}` : '@community';
-  document.getElementById('modal-sub-timestamp').textContent = new Date(item.timestamp).toLocaleString();
 
   // Hardware Details
-  document.getElementById('modal-hw-gpu').textContent = `${hw.gpu_name || 'N/A'} (x${hw.gpu_count || 1})`;
+  document.getElementById('modal-hw-gpu').textContent = `${hw.gpu_name || 'CPU'} (x${hw.gpu_count || 1})`;
   document.getElementById('modal-hw-vram').textContent = `${hw.gpu_vram_gb || 0} GB VRAM`;
-  document.getElementById('modal-hw-cuda').textContent = `CUDA ${hw.cuda_version || 'N/A'} / Driver ${hw.driver_version || 'N/A'}`;
   document.getElementById('modal-hw-backend').textContent = m.backend || 'transformers';
   document.getElementById('modal-hw-cpu').textContent = hw.cpu || 'N/A';
-  document.getElementById('modal-hw-cores').textContent = `${hw.cpu_cores || 0} cores`;
   document.getElementById('modal-hw-ram').textContent = `${hw.total_ram_gb || 0} GB Host RAM`;
   document.getElementById('modal-hw-os').textContent = hw.os || 'Linux';
-
-  // Telemetry details
-  const ttftEl = document.getElementById('modal-telemetry-ttft');
-  if (ttftEl) ttftEl.textContent = telem.ttft_ms ? `${telem.ttft_ms.toFixed(1)} ms` : 'N/A';
-
-  const tpotEl = document.getElementById('modal-telemetry-tpot');
-  if (tpotEl) tpotEl.textContent = telem.tpot_ms ? `${telem.tpot_ms.toFixed(2)} ms` : 'N/A';
-
-  const tpsEl = document.getElementById('modal-telemetry-tps');
-  if (tpsEl) tpsEl.textContent = telem.decode_tok_per_sec ? `${telem.decode_tok_per_sec.toFixed(1)} tok/s` : 'N/A';
-
-  const ramEl = document.getElementById('modal-telemetry-ram');
-  if (ramEl) ramEl.textContent = telem.peak_ram_mb ? `${telem.peak_ram_mb.toFixed(0)} MB` : 'N/A';
-
-  const vramEl = document.getElementById('modal-telemetry-vram');
-  if (vramEl) vramEl.textContent = telem.peak_vram_mb ? `${telem.peak_vram_mb.toFixed(0)} MB` : 'N/A';
-
-  // Category Pillars breakdown
-  const catsDiv = document.getElementById('modal-categories-breakdown');
-  if (catsDiv) {
-    const defaultCats = [
-      { name: "Reasoning", key: "reasoning", weight: "25%", score: s.arc },
-      { name: "Coding", key: "coding", weight: "30%", score: s.humaneval },
-      { name: "Instruction", key: "instruction", weight: "25%", score: s.ifeval },
-      { name: "Tool Calling", key: "tool_calling", weight: "20%", score: s.tool_calling }
-    ];
-    catsDiv.innerHTML = defaultCats.map(c => {
-      const catData = item.categories?.[c.key];
-      const sc = catData?.normalized_score !== undefined ? catData.normalized_score : c.score;
-      return `
-        <div class="category-card">
-          <div class="category-card-head">
-            <span class="category-card-title">${c.name} (${c.weight})</span>
-            <span class="category-card-score">${sc.toFixed(1)}%</span>
-          </div>
-          <div class="category-card-bar">
-            <div class="category-card-fill" style="width: ${Math.min(100, sc)}%"></div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
 
   // Dynamic Tasks Breakdown
   const breakdownDiv = document.getElementById('modal-tasks-breakdown');
   const taskKeys = Object.keys(tasks);
-  
+
   if (taskKeys.length > 0) {
     breakdownDiv.innerHTML = taskKeys.map(k => {
       const taskData = tasks[k];
-      const score = taskData.normalized_score !== undefined ? taskData.normalized_score : (taskData.score || 0);
-      const passed = taskData.passed_samples !== undefined ? `passed ${taskData.passed_samples}/${taskData.total_samples || '?'}` : '';
-      const speed = taskData.avg_tokens_per_sec ? `${taskData.avg_tokens_per_sec} tok/s` : '';
+      const score = taskData.normalized_score !== undefined ? taskData.normalized_score : (taskData.raw_score * 100 || 0);
+      const passed = taskData.passed_samples !== undefined ? `${taskData.passed_samples}/${taskData.total_samples || '?'}` : '';
       const ci = (taskData.ci_lower !== undefined && taskData.ci_upper !== undefined) ? `[${taskData.ci_lower}%, ${taskData.ci_upper}%]` : '';
-      const title = taskData.display_name || k.replace(/_/g, ' ').toUpperCase();
+      const title = k.replace(/_/g, ' ').toUpperCase();
 
       return `
         <div class="task">
@@ -747,702 +688,170 @@ function showModelModal(item) {
           </div>
           <div class="task-bar"><div class="task-fill" style="width: ${Math.min(100, score)}%"></div></div>
           <div class="task-meta">
-            <span>${taskData.raw_metric_name || taskData.metric || 'accuracy'}${passed ? ' &middot; ' + passed : ''}</span>
-            <span>${speed}</span>
+            <span>${taskData.raw_metric_name || 'accuracy'} &middot; passed ${passed}</span>
+            <span>Status: ${taskData.status || 'FULL'}</span>
           </div>
         </div>
       `;
     }).join('');
-  } else {
-    const fallbackTasks = [
-      { label: 'GSM8K (Math Reasoning)', score: s.gsm8k, desc: 'Grade School Math 8K strict answer accuracy' },
-      { label: 'HumanEval (Python Coding)', score: s.humaneval, desc: 'Code generation pass@1 execution accuracy' },
-      { label: 'ARC Challenge (Reasoning)', score: s.arc, desc: 'Grade school science multiple-choice reasoning' },
-      { label: 'IFEval (Instruction Following)', score: s.ifeval, desc: 'Verifiable constraint satisfaction & format compliance' },
-      { label: 'Tool Calling & Multiturn', score: s.tool_calling, desc: 'Function calling JSON schema adherence and execution' }
-    ];
-    breakdownDiv.innerHTML = fallbackTasks.map(t => `
-      <div class="task">
-        <div class="task-head">
-          <div><span class="task-name">${t.label}</span></div>
-          <span class="task-score">${t.score.toFixed(1)}%</span>
-        </div>
-        <div class="task-bar"><div class="task-fill" style="width: ${t.score}%"></div></div>
-      </div>
-    `).join('');
   }
 
-  // Raw Logs
-  document.getElementById('modal-raw-logs').textContent = item.raw_logs_preview || 'No logs attached.';
-  
   // Raw JSON
-  document.getElementById('modal-json-filename').textContent = item.filename || 'benchmark.json';
   const jsonString = JSON.stringify(item, null, 2);
-  document.getElementById('modal-raw-json').textContent = jsonString;
+  const rawJsonEl = document.getElementById('modal-raw-json');
+  if (rawJsonEl) rawJsonEl.textContent = jsonString;
 
-  // Download JSON button
-  const blob = new Blob([jsonString], { type: 'application/json' });
-  const downloadBtn = document.getElementById('download-json-btn');
-  downloadBtn.href = URL.createObjectURL(blob);
-  downloadBtn.download = item.filename || 'result.json';
-
-  // Copy buttons
-  document.getElementById('copy-logs-btn').onclick = () => {
-    navigator.clipboard.writeText(item.raw_logs_preview || '');
-    alert('Logs copied to clipboard!');
-  };
-  document.getElementById('copy-json-btn').onclick = () => {
-    navigator.clipboard.writeText(jsonString);
-    alert('JSON copied to clipboard!');
-  };
-
-  // Reset tab to overview
-  switchModalTab('tab-overview');
   modal.classList.remove('hidden');
 }
 
-function switchModalTab(tabId) {
-  document.querySelectorAll('.modal-tab-btn').forEach(btn => {
-    btn.classList.toggle('is-active', btn.getAttribute('data-tab') === tabId);
+function setupModalDismiss() {
+  const modal = document.getElementById('model-modal');
+  const closeBtns = document.querySelectorAll('.modal-dismiss');
+  closeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (modal) modal.classList.add('hidden');
+    });
   });
 
-  document.querySelectorAll('.modal-tab-content').forEach(content => {
-    if (content.id === tabId) {
-      content.classList.remove('hidden');
-    } else {
-      content.classList.add('hidden');
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+      modal.classList.add('hidden');
     }
   });
 }
 
-// Compare Modal (Side-by-Side Head to Head)
-function showCompareModal() {
-  const modal = document.getElementById('compare-modal');
-  const container = document.getElementById('compare-content');
-
-  const selectedModels = allModels.filter(m => selectedModelIds.has(m.model.model_slug || m.model.model_id));
-  if (selectedModels.length === 0) {
-    alert("Select two or three models from the leaderboard to compare them.");
-    return;
-  }
-
-  const scoreRows = [
-    ['Math (GSM8K)', 'gsm8k'],
-    ['Code (HumanEval)', 'humaneval'],
-    ['Reasoning (ARC)', 'arc'],
-    ['Instruction (IFEval)', 'ifeval'],
-    ['Tool Calling', 'tool_calling']
-  ];
-
-  container.innerHTML = `
-    <table class="compare">
-      <thead>
-        <tr>
-          <th>Metric</th>
-          ${selectedModels.map(m => `
-            <th>
-              <div class="compare-model">${m.model.model_id}</div>
-              <div class="compare-rank">Rank #${m.rank || '--'} &middot; ${m.model.param_count_b}B &middot; <span class="tag tag--profile-${m.profile || 'standard'}">${m.profile || 'standard'}</span></div>
-            </th>
-          `).join('')}
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="is-total">
-          <td class="metric-name">General (SLM-Index)</td>
-          ${selectedModels.map(m => `
-            <td class="total">
-              ${m.scores.overall.toFixed(1)}%
-              ${m.scores.ci_lower ? `<div class="ci-range" style="color:var(--rust-2)">95% CI: [${m.scores.ci_lower.toFixed(1)}, ${m.scores.ci_upper.toFixed(1)}]</div>` : ''}
-            </td>
-          `).join('')}
-        </tr>
-        <tr>
-          <td class="metric-name">Coding &amp; Agentic Index</td>
-          ${selectedModels.map(m => `<td class="num"><strong>${(m.scores.coding_agentic_index || 0).toFixed(1)}%</strong></td>`).join('')}
-        </tr>
-        <tr>
-          <td class="metric-name">Local Efficiency (Score/GB)</td>
-          ${selectedModels.map(m => `<td class="num"><strong>${(m.scores.score_per_gb || 0).toFixed(1)}</strong></td>`).join('')}
-        </tr>
-        <tr>
-          <td class="metric-name">Decode Speed</td>
-          ${selectedModels.map(m => `<td class="num">${(m.telemetry?.decode_tok_per_sec || m.scores?.speed || 0).toFixed(1)} tok/s</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="metric-name">Time to First Token (TTFT)</td>
-          ${selectedModels.map(m => `<td class="num">${m.telemetry?.ttft_ms ? m.telemetry.ttft_ms.toFixed(1) + ' ms' : 'N/A'}</td>`).join('')}
-        </tr>
-        ${scoreRows.map(([label, key]) => `
-          <tr>
-            <td class="metric-name">${label}</td>
-            ${selectedModels.map(m => `<td class="num">${m.scores[key].toFixed(1)}%</td>`).join('')}
-          </tr>
-        `).join('')}
-        <tr>
-          <td class="metric-name">Parameters</td>
-          ${selectedModels.map(m => `<td class="num">${m.model.param_count_b}B &middot; ${m.model.param_tier}</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="metric-name">Model Footprint</td>
-          ${selectedModels.map(m => `<td class="num">${m.model.model_ram_gb ? m.model.model_ram_gb.toFixed(1) + ' GB' : (m.hardware?.model_ram_gb ? m.hardware.model_ram_gb.toFixed(1) + ' GB' : 'N/A')}</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="metric-name">Precision</td>
-          ${selectedModels.map(m => `<td class="num">${m.model.quantization}</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="metric-name">Architecture</td>
-          ${selectedModels.map(m => `<td class="num">${m.model.architecture}</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="metric-name">Backend</td>
-          ${selectedModels.map(m => `<td class="num">${m.model.backend}</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="metric-name">GPU</td>
-          ${selectedModels.map(m => `<td class="num">${m.hardware?.gpu_name || 'N/A'}</td>`).join('')}
-        </tr>
-        <tr>
-          <td class="metric-name">Notes</td>
-          ${selectedModels.map(m => `<td class="num">${m.notes || '—'}</td>`).join('')}
-        </tr>
-      </tbody>
-    </table>
-  `;
-
-  modal.classList.remove('hidden');
-}
-
-// Chart.js Visualizations
 function renderCharts() {
-  const figuresSection = document.getElementById('figures');
-  if (allModels.length === 0) {
-    if (figuresSection) figuresSection.classList.add('hidden');
-    return;
-  }
-  if (figuresSection) figuresSection.classList.remove('hidden');
-
-  // Radar Chart: top 3 models or selected models
-  let modelsForRadar = allModels.slice(0, 3);
-  if (selectedModelIds.size > 0) {
-    const selected = allModels.filter(m => selectedModelIds.has(m.model.model_slug || m.model.model_id));
-    if (selected.length > 0) modelsForRadar = selected;
-  }
-
-  const radarLabels = ['GSM8K (Math)', 'HumanEval (Code)', 'ARC (Reasoning)', 'IFEval (Format)', 'Tool Calling'];
-  const colors = [
-    { bg: 'rgba(163, 58, 28, 0.16)', border: '#a33a1c' },
-    { bg: 'rgba(47, 90, 70, 0.16)', border: '#2f5a46' },
-    { bg: 'rgba(138, 103, 20, 0.16)', border: '#8a6714' }
-  ];
-
   const radarCanvas = document.getElementById('radarChart');
-  if (radarCanvas) {
-    const radarCtx = radarCanvas.getContext('2d');
-    if (radarChartInstance) radarChartInstance.destroy();
-
-    radarChartInstance = new Chart(radarCtx, {
-      type: 'radar',
-      data: {
-        labels: radarLabels,
-        datasets: modelsForRadar.map((item, idx) => ({
-          label: item.model.model_id.split('/')[1] || item.model.model_id,
-          data: [
-            item.scores.gsm8k,
-            item.scores.humaneval,
-            item.scores.arc,
-            item.scores.ifeval,
-            item.scores.tool_calling
-          ],
-          backgroundColor: colors[idx % colors.length].bg,
-          borderColor: colors[idx % colors.length].border,
-          borderWidth: 1.5,
-          pointBackgroundColor: colors[idx % colors.length].border,
-          pointBorderColor: '#f8f5ec',
-          pointRadius: 2.5,
-          pointHoverRadius: 5
-        }))
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          r: {
-            angleLines: { color: 'rgba(28, 26, 20, 0.12)' },
-            grid: { color: 'rgba(28, 26, 20, 0.12)' },
-            pointLabels: { color: '#4b473c', font: { size: 9, family: 'IBM Plex Mono' } },
-            ticks: { backdropColor: 'transparent', color: '#7a7464', stepSize: 20, font: { size: 8, family: 'IBM Plex Mono' } },
-            suggestedMin: 40,
-            suggestedMax: 100
-          }
-        },
-        plugins: {
-          legend: {
-            position: 'top',
-            labels: { color: '#1c1a14', font: { size: 10, family: 'IBM Plex Sans' }, boxWidth: 10, boxHeight: 10 }
-          }
-        }
-      }
-    });
-  }
-
-  // Scatter: Model Memory Footprint (GB) vs Composite SLM-Index (Local Efficiency frontier)
   const barCanvas = document.getElementById('barChart');
-  if (barCanvas) {
-    const barCtx = barCanvas.getContext('2d');
-    if (barChartInstance) barChartInstance.destroy();
 
-    const sortedByRam = [...allModels].sort((a, b) => (a.model.model_ram_gb || 0) - (b.model.model_ram_gb || 0));
+  if (!radarCanvas || !barCanvas) return;
 
-    barChartInstance = new Chart(barCtx, {
-      type: 'scatter',
-      data: {
-        datasets: [{
-          label: 'Models',
-          data: sortedByRam.map(m => ({
-            x: m.model.model_ram_gb || (m.model.param_count_b ? m.model.param_count_b * 0.65 : 2.0),
-            y: m.scores.overall,
-            model: m.model.model_id,
-            eff: (m.scores.score_per_gb || (m.model.model_ram_gb ? m.scores.overall / m.model.model_ram_gb : 0)).toFixed(1),
-            profile: m.profile || 'standard'
-          })),
-          backgroundColor: sortedByRam.map(m => {
-            if (m.scores.overall >= 85) return 'rgba(163, 58, 28, 0.85)';
-            if (m.scores.overall >= 80) return 'rgba(138, 103, 20, 0.72)';
-            return 'rgba(47, 90, 70, 0.75)';
-          }),
-          borderColor: 'rgba(28, 26, 20, 0.35)',
-          borderWidth: 1,
-          pointRadius: 6,
-          pointHoverRadius: 8
-        }]
+  const modelsToPlot = selectedModelIds.size > 0
+    ? allModels.filter(m => selectedModelIds.has(m.model.model_slug || m.model.model_id))
+    : allModels.filter(m => m.eligible_for_leaderboard).slice(0, 3);
+
+  if (modelsToPlot.length === 0) return;
+
+  // Radar Chart: Official Benchmark Pillars
+  const labels = ['Reasoning', 'Mathematics', 'Instruction', 'Coding', 'Tool Calling'];
+  const datasets = modelsToPlot.map((m, idx) => {
+    const colors = ['rgba(6, 182, 212, ', 'rgba(99, 102, 241, ', 'rgba(236, 72, 153, '];
+    const c = colors[idx % colors.length];
+    return {
+      label: m.model.model_id,
+      data: [
+        m.scores.reasoning || 0,
+        m.scores.mathematics || 0,
+        m.scores.instruction || 0,
+        m.scores.coding || 0,
+        m.scores.tool_calling || 0
+      ],
+      backgroundColor: c + '0.2)',
+      borderColor: c + '1.0)',
+      borderWidth: 2,
+      pointBackgroundColor: c + '1.0)',
+    };
+  });
+
+  if (radarChartInstance) radarChartInstance.destroy();
+  radarChartInstance = new Chart(radarCanvas, {
+    type: 'radar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        r: {
+          min: 0,
+          max: 100,
+          ticks: { color: '#94a3b8', backdropColor: 'transparent' },
+          grid: { color: '#334155' },
+          pointLabels: { color: '#e2e8f0', font: { size: 12 } }
+        }
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          x: {
-            min: 0,
-            title: {
-              display: true,
-              text: 'Model Memory Footprint (GB RAM / VRAM)',
-              color: '#6a6455',
-              font: { size: 9, family: 'IBM Plex Mono' }
-            },
-            grid: { color: 'rgba(28, 26, 20, 0.08)' },
-            ticks: { color: '#6a6455', font: { size: 9, family: 'IBM Plex Mono' } }
-          },
-          y: {
-            min: 40,
-            max: 100,
-            title: {
-              display: true,
-              text: 'General Composite (SLM-Index %)',
-              color: '#6a6455',
-              font: { size: 9, family: 'IBM Plex Mono' }
-            },
-            grid: { color: 'rgba(28, 26, 20, 0.08)' },
-            ticks: { color: '#6a6455', font: { size: 9, family: 'IBM Plex Mono' } }
-          }
+      plugins: {
+        legend: { labels: { color: '#e2e8f0' } }
+      }
+    }
+  });
+
+  // Scatter Chart: Score vs Memory Footprint
+  const scatterData = allModels.map(m => ({
+    x: m.model.model_ram_gb || 8.0,
+    y: m.scores.overall,
+    model: m.model.model_id
+  }));
+
+  if (barChartInstance) barChartInstance.destroy();
+  barChartInstance = new Chart(barCanvas, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: 'Models (Score vs RAM GB)',
+        data: scatterData,
+        backgroundColor: '#06b6d4',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          title: { display: true, text: 'RAM / VRAM Footprint (GB)', color: '#94a3b8' },
+          grid: { color: '#1e293b' },
+          ticks: { color: '#94a3b8' }
         },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => `${ctx.raw.model} (${ctx.raw.profile}): ${ctx.raw.y}% on ${ctx.raw.x.toFixed(1)}GB (Eff: ${ctx.raw.eff} score/GB)`
-            }
+        y: {
+          min: 0,
+          max: 100,
+          title: { display: true, text: 'Composite SLM-Index (%)', color: '#94a3b8' },
+          grid: { color: '#1e293b' },
+          ticks: { color: '#94a3b8' }
+        }
+      },
+      plugins: {
+        legend: { labels: { color: '#e2e8f0' } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.raw.model}: ${ctx.raw.y.toFixed(1)}% (${ctx.raw.x.toFixed(1)} GB)`
           }
         }
       }
-    });
-  }
-}
-
-// PR Guide & Local Validator Logic
-function loadPRTemplate() {
-  const prPre = document.getElementById('pr-template-preview');
-  if (prPre) prPre.textContent = PR_TEMPLATE_TEXT;
-}
-
-function setupEventListeners() {
-  // Track switcher pill buttons
-  document.querySelectorAll('.track-pill').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.track-pill').forEach(p => p.classList.remove('is-active'));
-      btn.classList.add('is-active');
-      currentTrack = btn.getAttribute('data-track');
-
-      const sortSelect = document.getElementById('sort-select');
-      if (currentTrack === 'general') {
-        currentSort = { column: 'overall', direction: 'desc' };
-        if (sortSelect) sortSelect.value = 'overall_desc';
-      } else if (currentTrack === 'coding_agentic') {
-        currentSort = { column: 'coding_agentic', direction: 'desc' };
-        if (sortSelect) sortSelect.value = 'coding_agentic_desc';
-      } else if (currentTrack === 'efficiency') {
-        currentSort = { column: 'efficiency', direction: 'desc' };
-        if (sortSelect) sortSelect.value = 'efficiency_desc';
-      }
-
-      updateHeaderSortIcons();
-      applyFiltersAndSort();
-    });
-  });
-
-  // Search
-  const searchInput = document.getElementById('search-input');
-  const clearSearchBtn = document.getElementById('clear-search-btn');
-
-  if (searchInput && clearSearchBtn) {
-    searchInput.addEventListener('input', () => {
-      if (searchInput.value.trim().length > 0) {
-        clearSearchBtn.classList.remove('hidden');
-      } else {
-        clearSearchBtn.classList.add('hidden');
-      }
-      applyFiltersAndSort();
-    });
-
-    clearSearchBtn.addEventListener('click', () => {
-      searchInput.value = '';
-      clearSearchBtn.classList.add('hidden');
-      applyFiltersAndSort();
-    });
-  }
-
-  // Filters
-  document.getElementById('tier-filter')?.addEventListener('change', applyFiltersAndSort);
-  document.getElementById('profile-filter')?.addEventListener('change', applyFiltersAndSort);
-  document.getElementById('license-filter')?.addEventListener('change', applyFiltersAndSort);
-  document.getElementById('quant-filter')?.addEventListener('change', applyFiltersAndSort);
-  
-  // Sort select dropdown
-  document.getElementById('sort-select')?.addEventListener('change', (e) => {
-    const val = e.target.value;
-    const parts = val.split('_');
-    const dir = parts.pop();
-    const col = parts.join('_');
-    currentSort = { column: col, direction: dir };
-    updateHeaderSortIcons();
-    applyFiltersAndSort();
-  });
-
-  // Header Table Column Click to Sort
-  document.querySelectorAll('#leaderboard-table th[data-sort]').forEach(th => {
-    th.addEventListener('click', () => {
-      const col = th.getAttribute('data-sort');
-      if (currentSort.column === col) {
-        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-      } else {
-        currentSort.column = col;
-        currentSort.direction = (col === 'name' || col === 'rank') ? 'asc' : 'desc';
-      }
-      updateHeaderSortIcons();
-      applyFiltersAndSort();
-    });
-  });
-
-  // Reset Filters
-  document.getElementById('reset-filters-btn')?.addEventListener('click', () => {
-    if (searchInput) searchInput.value = '';
-    if (clearSearchBtn) clearSearchBtn.classList.add('hidden');
-    const tier = document.getElementById('tier-filter');
-    const prof = document.getElementById('profile-filter');
-    const lic = document.getElementById('license-filter');
-    const quant = document.getElementById('quant-filter');
-    const sort = document.getElementById('sort-select');
-
-    if (tier) tier.value = 'all';
-    if (prof) prof.value = 'all';
-    if (lic) lic.value = 'all';
-    if (quant) quant.value = 'all';
-    if (sort) sort.value = 'overall_desc';
-
-    document.querySelectorAll('.track-pill').forEach(p => p.classList.remove('is-active'));
-    document.querySelector('.track-pill[data-track="all"]')?.classList.add('is-active');
-    currentTrack = 'all';
-
-    currentSort = { column: 'overall', direction: 'desc' };
-    updateHeaderSortIcons();
-    applyFiltersAndSort();
-  });
-
-  // Export buttons
-  document.getElementById('export-csv-btn')?.addEventListener('click', exportToCSV);
-  document.getElementById('export-json-btn')?.addEventListener('click', exportToJSON);
-
-  // Compare Navigation and Dock buttons
-  document.getElementById('nav-compare-btn')?.addEventListener('click', showCompareModal);
-  document.getElementById('dock-compare-btn')?.addEventListener('click', showCompareModal);
-  document.getElementById('dock-clear-btn')?.addEventListener('click', () => {
-    selectedModelIds.clear();
-    applyFiltersAndSort();
-    renderCharts();
-  });
-  document.getElementById('compare-modal-close')?.addEventListener('click', () => {
-    document.getElementById('compare-modal')?.classList.add('hidden');
-  });
-
-  // Inspector Modal Tab Switchers
-  document.querySelectorAll('.modal-tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      switchModalTab(btn.getAttribute('data-tab'));
-    });
-  });
-
-  // Inspector Modal Close
-  document.getElementById('modal-close-btn')?.addEventListener('click', () => {
-    document.getElementById('model-modal')?.classList.add('hidden');
-  });
-  document.getElementById('modal-footer-close')?.addEventListener('click', () => {
-    document.getElementById('model-modal')?.classList.add('hidden');
-  });
-
-  // PR Guide Modal triggers
-  const prModal = document.getElementById('pr-guide-modal');
-  const openPrBtns = [
-    document.getElementById('open-pr-guide-btn'),
-    document.getElementById('cta-pr-guide-btn'),
-    document.getElementById('cta-pr-guide-btn-secondary')
-  ];
-  openPrBtns.forEach(btn => {
-    if (btn) btn.addEventListener('click', () => {
-      switchPRTab('pr-tab-steps');
-      prModal?.classList.remove('hidden');
-    });
-  });
-
-  document.getElementById('cta-test-validator-btn')?.addEventListener('click', () => {
-    switchPRTab('pr-tab-validator');
-    prModal?.classList.remove('hidden');
-  });
-
-  document.getElementById('pr-guide-close-btn')?.addEventListener('click', () => {
-    prModal?.classList.add('hidden');
-  });
-  document.getElementById('pr-guide-close-bottom')?.addEventListener('click', () => {
-    prModal?.classList.add('hidden');
-  });
-
-  // PR Tabs
-  document.querySelectorAll('.pr-tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      switchPRTab(btn.getAttribute('data-prtab'));
-    });
-  });
-
-  // PR Template copy button
-  document.getElementById('copy-pr-template-btn')?.addEventListener('click', () => {
-    navigator.clipboard.writeText(PR_TEMPLATE_TEXT);
-    alert('PR Template copied to clipboard!');
-  });
-
-  // Validator Buttons
-  document.getElementById('validate-btn')?.addEventListener('click', runLocalJsonValidation);
-  document.getElementById('load-sample-btn')?.addEventListener('click', () => {
-    const sample = {
-      schema_version: "1.0.0",
-      evaluation_id: "eval-sample-submission-standard",
-      timestamp: new Date().toISOString(),
-      profile: "standard",
-      submitter: { name: "Your Name", github_handle: "your-gh-handle", affiliation: "Community" },
-      model: {
-        model_id: "org/sample-model-7b",
-        model_slug: "sample-model-7b-GGUF_Q4_K_M",
-        param_count_b: 7.2,
-        param_tier: "7B–14B",
-        quantization: "GGUF Q4_K_M",
-        license: "Apache-2.0",
-        backend: "llama.cpp",
-        model_ram_gb: 4.8
-      },
-      hardware: {
-        gpu_name: "NVIDIA RTX 4080",
-        gpu_count: 1,
-        gpu_vram_gb: 16.0,
-        model_ram_gb: 4.8,
-        cpu: "AMD Ryzen 9 7900X",
-        cpu_cores: 12,
-        total_ram_gb: 64.0,
-        os: "Ubuntu 24.04",
-        cuda_version: "12.4"
-      },
-      telemetry: {
-        ttft_ms: 185.0,
-        decode_tok_per_sec: 62.5,
-        tpot_ms: 16.0,
-        peak_ram_mb: 1800.0,
-        peak_vram_mb: 5100.0
-      },
-      categories: {
-        reasoning: { category: "reasoning", weight: 0.25, normalized_score: 85.0 },
-        coding: { category: "coding", weight: 0.30, normalized_score: 82.0 },
-        instruction: { category: "instruction", weight: 0.25, normalized_score: 80.0 },
-        tool_calling: { category: "tool_calling", weight: 0.20, normalized_score: 79.0 }
-      },
-      slm_index: 81.85,
-      ci_lower: 79.5,
-      ci_upper: 84.1,
-      coding_agentic_index: 80.80,
-      local_efficiency: {
-        score_per_gb: 17.05,
-        throughput_tps: 62.5,
-        effective_memory_gb: 4.8,
-        efficiency_score: 85.4
-      },
-      summary_scores: {
-        overall_score: 81.85,
-        gsm8k: 85.0,
-        humaneval: 82.0,
-        arc: 85.0,
-        ifeval: 80.0,
-        tool_calling: 79.0
-      }
-    };
-    const input = document.getElementById('validator-input');
-    if (input) input.value = JSON.stringify(sample, null, 2);
-  });
-}
-
-function switchPRTab(tabId) {
-  document.querySelectorAll('.pr-tab-btn').forEach(btn => {
-    btn.classList.toggle('is-active', btn.getAttribute('data-prtab') === tabId);
-  });
-
-  document.querySelectorAll('.pr-tab-content').forEach(c => {
-    if (c.id === tabId) {
-      c.classList.remove('hidden');
-    } else {
-      c.classList.add('hidden');
     }
   });
 }
 
-// In-Browser Submission JSON Validator
-function runLocalJsonValidation() {
-  const inputEl = document.getElementById('validator-input');
-  const input = (inputEl?.value || '').trim();
-  const feedback = document.getElementById('validator-feedback');
-  if (!feedback) return;
-
-  if (!input) {
-    feedback.className = 'feedback feedback--error';
-    feedback.innerHTML = '<strong>No JSON provided</strong>Paste result JSON to validate.';
-    feedback.classList.remove('hidden');
-    return;
-  }
-
-  try {
-    const data = JSON.parse(input);
-    const errors = [];
-
-    if (!data.model) errors.push("Missing 'model' object.");
-    else {
-      if (!data.model.model_id) errors.push("Missing 'model.model_id'.");
-      if (data.model.param_count_b === undefined) errors.push("Missing 'model.param_count_b'.");
-      if (!data.model.quantization) errors.push("Missing 'model.quantization'.");
-      if (!data.model.license) errors.push("Missing 'model.license'.");
-    }
-
-    if (!data.hardware) errors.push("Missing 'hardware' (GPU, CPU, RAM).");
-    if (!data.summary_scores && !data.tasks && !data.categories && data.slm_index === undefined) {
-      errors.push("Missing scores ('slm_index', 'summary_scores', 'categories', or 'tasks').");
-    }
-
-    if (errors.length > 0) {
-      feedback.className = 'feedback feedback--error';
-      feedback.innerHTML = `<strong>${errors.length} field${errors.length === 1 ? '' : 's'} missing</strong><ul>${errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
-      feedback.classList.remove('hidden');
-    } else {
-      feedback.className = 'feedback feedback--ok';
-      const prof = data.profile || "standard";
-      const slmIdx = data.slm_index || data.summary_scores?.overall_score || 0;
-      feedback.innerHTML = `<strong>Valid Submission</strong>Profile: <em>${prof}</em> &bull; SLM-Index: <em>${slmIdx}%</em> &bull; All required schema fields are present.`;
-      feedback.classList.remove('hidden');
-    }
-  } catch (err) {
-    feedback.className = 'feedback feedback--error';
-    feedback.innerHTML = `<strong>Invalid JSON</strong>${err.message}`;
-    feedback.classList.remove('hidden');
-  }
-}
-
-// Update table header sort markers
-function updateHeaderSortIcons() {
-  const cols = ['rank', 'name', 'params', 'overall', 'coding_agentic', 'efficiency', 'speed', 'gsm8k', 'humaneval', 'arc', 'ifeval', 'tool_calling'];
-  cols.forEach(col => {
-    const icon = document.getElementById(`sort-icon-${col}`);
-    if (!icon) return;
-
-    if (currentSort.column === col) {
-      icon.textContent = currentSort.direction === 'asc' ? '\u2191' : '\u2193';
-      icon.className = 'sort-mark is-active';
-    } else {
-      icon.textContent = '\u00b7';
-      icon.className = 'sort-mark';
-    }
-  });
-}
-
-// Export CSV of current filtered view
-function exportToCSV() {
-  if (filteredModels.length === 0) {
-    alert("No models to export.");
-    return;
-  }
-
-  const headers = [
-    'Rank', 'Model ID', 'Parameters (B)', 'Tier', 'Profile', 'SLM-Index',
-    'Coding & Agentic Index', 'Local Efficiency (Score/GB)', 'Throughput (tok/s)',
-    'GSM8K', 'HumanEval', 'ARC', 'IFEval', 'Tool Calling', 'Quantization', 'Architecture', 'License', 'Backend', 'GPU'
-  ];
-  const rows = filteredModels.map(item => [
-    item.rank,
-    `"${item.model.model_id}"`,
-    item.model.param_count_b,
-    `"${item.model.param_tier}"`,
-    `"${item.profile || 'standard'}"`,
-    item.scores.overall,
-    item.scores.coding_agentic_index || 0,
-    item.scores.score_per_gb || 0,
-    item.telemetry?.decode_tok_per_sec || item.scores?.speed || 0,
-    item.scores.gsm8k,
-    item.scores.humaneval,
-    item.scores.arc,
-    item.scores.ifeval,
-    item.scores.tool_calling,
-    `"${item.model.quantization}"`,
-    `"${item.model.architecture}"`,
-    `"${item.model.license}"`,
-    `"${item.model.backend}"`,
-    `"${item.hardware?.gpu_name || 'N/A'}"`
+function exportCSV() {
+  if (!filteredModels.length) return;
+  const headers = ['Model ID', 'Parameters (B)', 'Quantization', 'Status', 'SLM-Index', 'Reasoning', 'Math', 'Instruction', 'Coding', 'Tools', 'RAM GB', 'Speed tok/s'];
+  const rows = filteredModels.map(m => [
+    `"${m.model.model_id}"`,
+    m.model.param_count_b || '',
+    `"${m.model.quantization}"`,
+    m.status,
+    m.scores.overall,
+    m.scores.reasoning || '',
+    m.scores.mathematics || '',
+    m.scores.instruction || '',
+    m.scores.coding || '',
+    m.scores.tool_calling || '',
+    m.model.model_ram_gb || '',
+    m.telemetry?.decode_tok_per_sec || ''
   ]);
-
-  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `ai-model-leaderboard-${new Date().toISOString().slice(0, 10)}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'slm_bench_leaderboard.csv';
+  a.click();
 }
 
-// Export JSON of current filtered view
-function exportToJSON() {
-  if (filteredModels.length === 0) {
-    alert("No models to export.");
-    return;
-  }
-  const jsonContent = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(filteredModels, null, 2));
-  const link = document.createElement("a");
-  link.setAttribute("href", jsonContent);
-  link.setAttribute("download", `ai-model-leaderboard-${new Date().toISOString().slice(0, 10)}.json`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+function exportJSON() {
+  if (!filteredModels.length) return;
+  const jsonContent = JSON.stringify(filteredModels, null, 2);
+  const blob = new Blob([jsonContent], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'slm_bench_leaderboard.json';
+  a.click();
 }
-
-// Start application when DOM is ready
-window.addEventListener('DOMContentLoaded', initApp);

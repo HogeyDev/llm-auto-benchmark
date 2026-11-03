@@ -1,4 +1,8 @@
-"""Instruction following benchmark modules."""
-from .ifbench import IFBenchBenchmark
+"""
+Instruction following benchmark adapters.
+"""
 
-__all__ = ["IFBenchBenchmark"]
+from .ifeval import IFEvalBenchmark
+from .ifeval_checkers import verify_instruction_constraint
+
+__all__ = ["IFEvalBenchmark", "verify_instruction_constraint"]

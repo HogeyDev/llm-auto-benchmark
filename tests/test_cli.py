@@ -31,7 +31,7 @@ def test_cli_evaluate_and_threshold(tmp_path):
         "--sample-limit", "1",
     ])
     assert result.exit_code == 0
-    assert "Composite SLM-Index" in result.output
+    assert "SLM-Index" in result.output
     # Check that file exists
     saved_files = list(out_dir.glob("*.json"))
     assert len(saved_files) == 1
@@ -68,7 +68,7 @@ def test_cli_large_model_allowed_as_small_local_ai(tmp_path):
     ])
     # No parameter ceiling enforced - evaluated as small local AI
     assert result.exit_code == 0
-    assert "Composite SLM-Index" in result.output
+    assert "SLM-Index" in result.output
     saved_files = list(out_dir.glob("*.json"))
     assert len(saved_files) == 1
 

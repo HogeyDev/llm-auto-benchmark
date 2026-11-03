@@ -1,0 +1,162 @@
+{
+  "filename": "meta-llama_Llama-3.2-3B-Instruct-BF16.json",
+  "schema_version": "2.0.0",
+  "evaluation_id": "eval-llama32-3b-20261102",
+  "timestamp": "2026-11-02T11:45:00Z",
+  "profile": "standard",
+  "status": "FULL",
+  "eligible_for_leaderboard": true,
+  "is_legacy": false,
+  "submitter": {
+    "name": "Community Contributor",
+    "github_handle": "local-ai-eval",
+    "affiliation": "Open Source"
+  },
+  "model": {
+    "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+    "model_slug": "meta-llama-Llama-3.2-3B-Instruct-BF16",
+    "hf_url": "https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct",
+    "param_count_b": 3.2,
+    "param_tier": "3B\u20138B",
+    "architecture": "LlamaForCausalLM",
+    "quantization": "BF16",
+    "model_ram_gb": 6.8,
+    "context_length": 131072,
+    "license": "Llama 3.2 Community",
+    "backend": "transformers",
+    "reasoning_effort": null
+  },
+  "hardware": {
+    "gpu_name": "NVIDIA GeForce RTX 3090",
+    "gpu_count": 1,
+    "gpu_vram_gb": 24.0,
+    "model_ram_gb": 6.8,
+    "cpu": "AMD Ryzen 7 5800X",
+    "cpu_cores": 8,
+    "total_ram_gb": 32.0,
+    "os": "Windows 11 (build 22631)",
+    "cuda_version": "12.2",
+    "driver_version": "537.13"
+  },
+  "telemetry": {
+    "ttft_ms": 110.5,
+    "decode_tok_per_sec": 78.2,
+    "tpot_ms": 12.78,
+    "peak_ram_mb": 1450.0,
+    "peak_vram_mb": 7200.0
+  },
+  "categories": {
+    "reasoning": {
+      "category": "reasoning",
+      "weight": 0.35,
+      "normalized_score": 49.3,
+      "task_count": 3,
+      "tasks": [
+        "mmlu_pro",
+        "gpqa_diamond",
+        "bbh"
+      ]
+    },
+    "mathematics": {
+      "category": "mathematics",
+      "weight": 0.35,
+      "normalized_score": 71.4,
+      "task_count": 2,
+      "tasks": [
+        "gsm8k",
+        "math500"
+      ]
+    },
+    "instruction": {
+      "category": "instruction",
+      "weight": 0.3,
+      "normalized_score": 74.1,
+      "task_count": 1,
+      "tasks": [
+        "ifeval"
+      ]
+    }
+  },
+  "tasks": {
+    "mmlu_pro": {
+      "task_id": "mmlu_pro",
+      "category": "reasoning",
+      "status": "FULL",
+      "raw_score": 0.448,
+      "raw_metric_name": "accuracy",
+      "normalized_score": 44.8,
+      "total_samples": 12032,
+      "passed_samples": 5390,
+      "ci_lower": 43.9,
+      "ci_upper": 45.7
+    },
+    "gpqa_diamond": {
+      "task_id": "gpqa_diamond",
+      "category": "reasoning",
+      "status": "FULL",
+      "raw_score": 0.343,
+      "raw_metric_name": "accuracy",
+      "normalized_score": 34.3,
+      "total_samples": 198,
+      "passed_samples": 68,
+      "ci_lower": 28.1,
+      "ci_upper": 41.2
+    },
+    "bbh": {
+      "task_id": "bbh",
+      "category": "reasoning",
+      "status": "FULL",
+      "raw_score": 0.688,
+      "raw_metric_name": "accuracy",
+      "normalized_score": 68.8,
+      "total_samples": 6511,
+      "passed_samples": 4479,
+      "ci_lower": 67.7,
+      "ci_upper": 69.9
+    },
+    "gsm8k": {
+      "task_id": "gsm8k",
+      "category": "mathematics",
+      "status": "FULL",
+      "raw_score": 0.778,
+      "raw_metric_name": "accuracy",
+      "normalized_score": 77.8,
+      "total_samples": 1319,
+      "passed_samples": 1026,
+      "ci_lower": 75.5,
+      "ci_upper": 80.0
+    },
+    "math500": {
+      "task_id": "math500",
+      "category": "mathematics",
+      "status": "FULL",
+      "raw_score": 0.65,
+      "raw_metric_name": "accuracy",
+      "normalized_score": 65.0,
+      "total_samples": 500,
+      "passed_samples": 325,
+      "ci_lower": 60.7,
+      "ci_upper": 69.1
+    },
+    "ifeval": {
+      "task_id": "ifeval",
+      "category": "instruction",
+      "status": "FULL",
+      "raw_score": 0.741,
+      "raw_metric_name": "prompt_level_strict_accuracy",
+      "normalized_score": 74.1,
+      "total_samples": 541,
+      "passed_samples": 401,
+      "ci_lower": 70.2,
+      "ci_upper": 77.7
+    }
+  },
+  "slm_index": 64.5,
+  "local_efficiency": {
+    "score_per_gb": 9.49,
+    "tokens_per_sec": 78.2,
+    "memory_footprint_gb": 6.8,
+    "efficiency_score": 79.1
+  },
+  "notes": "Full official standard profile run."
+}

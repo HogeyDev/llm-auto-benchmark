@@ -1,4 +1,7 @@
-"""Tool calling benchmark modules."""
-from .bfcl import BFCLBenchmark
+"""
+Tool calling benchmark adapters.
+"""
 
-__all__ = ["BFCLBenchmark"]
+from .bfcl import BFCLBenchmark, parse_function_calls
+
+__all__ = ["BFCLBenchmark", "parse_function_calls"]

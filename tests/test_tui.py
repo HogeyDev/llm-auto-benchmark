@@ -83,7 +83,7 @@ def test_tui_table_clearing_on_start():
         app = SLMBenchTUI(default_backend="mock")
         async with app.run_test() as pilot:
             table = app.query_one("#results-table", DataTable)
-            table.add_row("Reasoning", "slm_reasoning_cot", "100%", "5/5", "10ms", "50")
+            table.add_row("Reasoning", "mmlu_pro", "100%", "5/5", "10ms", "50")
             assert table.row_count == 1
 
             # Calling start_evaluation clears table

@@ -1,133 +1,61 @@
 """
-EvalPlus (HumanEval+ / MBPP+) benchmark adapter.
-Rigorous coding evaluation using expanded test cases (30x-80x more edge cases)
-to catch functions that pass obvious tests but fail edge conditions.
+Official EvalPlus (HumanEval+ and MBPP+) Benchmark Adapter.
+Evaluates Python code generation against expanded hidden test suites.
+Enforces isolated container-based sandbox execution.
+If Docker container isolation is unavailable, marks the evaluation as UNAVAILABLE
+rather than executing untrusted model-generated code directly on the host process.
 """
 
 import re
-import ast
-from typing import Optional, List, Dict, Any, Callable, Tuple
+import time
+from typing import Optional, List, Dict, Any
 from ..base import BaseBenchmarkTask
 from ...backends.base import BaseInferenceBackend
-from ...models.schema import TaskMetric
-from ...metrics.confidence import compute_metric_confidence
+from ...models.schema import TaskMetric, QuestionResult
+from ...metrics.confidence import wilson_score_interval
+from ...datasets.manager import DatasetManager
+from ...execution.sandbox import ContainerSandbox
+from ...utils.logger import logger
 
 
-EVALPLUS_DATASET = [
-    {
-        "id": "evalplus_has_close_elements",
-        "entry_point": "has_close_elements",
-        "prompt": "def has_close_elements(numbers: list[float], threshold: float) -> bool:\n    \"\"\"Check if in given list of numbers, are any two numbers closer to each other than given threshold.\n    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)\n    False\n    >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)\n    True\n    \"\"\"\n",
-        # Extended test suite with edge cases (empty list, identical elements, negative threshold, negative numbers)
-        "test_cases": [
-            ([1.0, 2.0, 3.9, 4.0, 5.0, 2.2], 0.3, True),
-            ([1.0, 2.0, 3.9, 4.0, 5.0, 2.2], 0.05, False),
-            ([1.0, 2.0, 5.9, 4.0, 5.0], 0.95, True),
-            ([1.0, 2.0, 5.9, 4.0, 5.0], 0.8, False),
-            ([1.0, 2.0, 3.0, 4.0, 5.0, 2.0], 0.1, True),
-            ([], 0.5, False),  # Edge case: empty list
-            ([5.0], 0.5, False),  # Edge case: single element
-            ([1.0, 1.0], 0.0, False),  # Edge case: distance 0 vs threshold 0
-            ([-5.0, -4.9], 0.2, True),  # Edge case: negative floats
-        ],
-    },
-    {
-        "id": "evalplus_intersperse",
-        "entry_point": "intersperse",
-        "prompt": "def intersperse(numbers: list[int], delimeter: int) -> list[int]:\n    \"\"\"Insert a number 'delimeter' between every two consecutive elements of input list `numbers'\n    >>> intersperse([], 4)\n    []\n    >>> intersperse([1, 2, 3], 4)\n    [1, 4, 2, 4, 3]\n    \"\"\"\n",
-        "test_cases": [
-            ([], 4, []),
-            ([1, 2, 3], 4, [1, 4, 2, 4, 3]),
-            ([5], 1, [5]),  # Edge case: single element
-            ([2, 2, 2], 2, [2, 2, 2, 2, 2]),
-            ([0, 0], -1, [0, -1, 0]),
-        ],
-    },
-    {
-        "id": "evalplus_filter_by_prefix",
-        "entry_point": "filter_by_prefix",
-        "prompt": "def filter_by_prefix(strings: list[str], prefix: str) -> list[str]:\n    \"\"\"Filter an input list of strings only for ones that start with a given prefix.\n    >>> filter_by_prefix([], 'a')\n    []\n    >>> filter_by_prefix(['abc', 'bcd', 'cde', 'array'], 'a')\n    ['abc', 'array']\n    \"\"\"\n",
-        "test_cases": [
-            ([], "a", []),
-            (["abc", "bcd", "cde", "array"], "a", ["abc", "array"]),
-            (["grunt", "trumpet", "prune", "gruff"], "gru", ["grunt", "gruff"]),
-            (["test"], "", ["test"]),  # Edge case: empty prefix matches all
-            ([""], "a", []),  # Edge case: empty string
-            (["apple", "Apple"], "a", ["apple"]),  # Edge case: case sensitivity
-        ],
-    },
-    {
-        "id": "evalplus_truncate_number",
-        "entry_point": "truncate_number",
-        "prompt": "def truncate_number(number: float) -> float:\n    \"\"\"Given a positive floating point number, it can be decomposed into\n    and integer part (largest integer smaller than given number) and decimals\n    (leftover part always smaller than 1, also called fractional part).\n    Return the decimal part of the number.\n    >>> truncate_number(3.5)\n    0.5\n    \"\"\"\n",
-        "test_cases": [
-            (3.5, 0.5),
-            (1.33, 0.33),
-            (123.456, 0.456),
-            (2.0, 0.0),
-        ],
-    },
-]
+def extract_python_code(text: str, entry_point: Optional[str] = None) -> str:
+    """Extract Python code block from model response."""
+    clean = text.strip()
+    # Search for markdown python block
+    matches = re.findall(r"```(?:python)?\s*([\s\S]*?)```", clean, re.IGNORECASE)
+    if matches:
+        # Choose block containing entry point if specified
+        if entry_point:
+            for m in reversed(matches):
+                if entry_point in m:
+                    return m.strip()
+        return matches[-1].strip()
 
-
-def extract_python_code(text: str) -> str:
-    """Extract code block from markdown or return raw string."""
-    m = re.findall(r"```(?:python)?\s*\n(.*?)\n```", text, re.DOTALL)
-    if m:
-        return m[-1].strip()
-    return text.strip()
-
-
-def run_evalplus_test(code_str: str, entry_point: str, test_cases: List[Any]) -> Tuple[bool, int, int]:
-    """Execute code against expanded test suite in restricted local namespace."""
-    passed_cases = 0
-    total_cases = len(test_cases)
-    
-    # Pre-parse syntax
-    try:
-        ast.parse(code_str)
-    except SyntaxError:
-        return False, 0, total_cases
-
-    namespace: Dict[str, Any] = {}
-    try:
-        exec(code_str, namespace)
-        fn = namespace.get(entry_point)
-        if not callable(fn):
-            return False, 0, total_cases
-
-        for tc in test_cases:
-            if len(tc) == 3:
-                args = (tc[0], tc[1])
-                expected = tc[2]
-            else:
-                args = (tc[0],)
-                expected = tc[1]
-
-            actual = fn(*args)
-            if isinstance(expected, float):
-                if abs(actual - expected) < 1e-3:
-                    passed_cases += 1
-            elif actual == expected:
-                passed_cases += 1
-
-    except Exception:
-        pass
-
-    return (passed_cases == total_cases), passed_cases, total_cases
+    # If no fences, filter code lines
+    lines = clean.splitlines()
+    code_lines = []
+    started = False
+    for line in lines:
+        if line.startswith("def ") or line.startswith("import ") or line.startswith("from ") or started:
+            started = True
+            code_lines.append(line)
+    return "\n".join(code_lines).strip() if code_lines else clean
 
 
 class EvalPlusBenchmark(BaseBenchmarkTask):
-    """Evaluates Python code generation against rigorous HumanEval+/MBPP+ edge-case test suites."""
+    """Evaluates Python code synthesis on HumanEval+ and MBPP+ with container sandbox."""
 
-    def __init__(self):
+    def __init__(self, subset: str = "humanevalplus", dataset_manager: Optional[DatasetManager] = None):
         super().__init__(
-            task_id="evalplus_coding",
+            task_id=f"evalplus_{subset}" if subset != "humanevalplus" else "evalplus",
             category="coding",
-            description="EvalPlus expanded edge-case coding evaluation (HumanEval+ / MBPP+).",
+            description=f"EvalPlus ({subset}) code synthesis evaluated against expanded hidden tests.",
             raw_metric_name="pass@1",
             weight=1.0,
         )
+        self.subset = subset
+        self.dm = dataset_manager or DatasetManager()
+        self.sandbox = ContainerSandbox()
 
     def run(
         self,
@@ -135,81 +63,152 @@ class EvalPlusBenchmark(BaseBenchmarkTask):
         sample_limit: Optional[int] = None,
         on_sample: Optional[Any] = None,
         cancel_event: Optional[Any] = None,
+        seed: int = 42,
     ) -> TaskMetric:
-        dataset = EVALPLUS_DATASET[:sample_limit] if sample_limit else EVALPLUS_DATASET
+        # Security Gate: Require container sandbox
+        if not self.sandbox.is_available():
+            logger.warning(
+                f"Docker daemon is not running. Marking {self.task_id} as UNAVAILABLE. "
+                "Untrusted code execution on host is blocked."
+            )
+            return TaskMetric(
+                task_id=self.task_id,
+                category=self.category,
+                status="UNAVAILABLE",
+                raw_score=0.0,
+                raw_metric_name="pass@1",
+                normalized_score=0.0,
+                total_samples=0,
+                passed_samples=0,
+                failed_samples=0,
+                invalid_responses=0,
+                ci_lower=0.0,
+                ci_upper=0.0,
+                dataset_name=f"evalplus/{self.subset}",
+                dataset_revision="v0.3.0",
+                split="test",
+                sub_metrics={"error": "Docker container sandbox is unavailable. Host execution of untrusted code is prohibited."},
+                question_results=[],
+            )
+
+        full_dataset = self.dm.load_evalplus(self.subset)
+
+        if sample_limit and sample_limit < len(full_dataset):
+            dataset, selected_ids = self.dm.sample_stratified(
+                full_dataset,
+                sample_size=sample_limit,
+                seed=seed,
+            )
+            run_status = "PARTIAL"
+        else:
+            dataset = full_dataset
+            run_status = "FULL"
+
         total = len(dataset)
         passed = 0
-        total_latency = 0.0
+        error_categories: Dict[str, int] = {
+            "syntax_error": 0,
+            "assertion_error": 0,
+            "timeout": 0,
+            "runtime_error": 0,
+        }
+        question_results: List[QuestionResult] = []
+
+        total_latency_ms = 0.0
         total_tokens = 0
-        breakdown = []
 
         system_prompt = (
-            "You are an expert Python developer. Complete the requested Python function. "
-            "Write robust, edge-case compliant code. Respond ONLY with valid Python code wrapped in ```python ... ```."
+            "You are an expert Python software engineer. Implement the required function thoroughly.\n"
+            "Return only the complete Python implementation inside a ```python ``` block."
         )
 
         for idx, item in enumerate(dataset):
             if cancel_event and cancel_event.is_set():
-                break
+                raise InterruptedError("EvalPlus evaluation cancelled.")
 
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Complete this function:\n{item['prompt']}"},
-            ]
+            prompt = item.get("prompt", "")
+            entry_point = item.get("entry_point")
+            hidden_test = item.get("test", "")
 
-            gen = backend.chat(messages, max_new_tokens=384, temperature=0.0)
-            total_latency += gen.latency_ms
+            start_t = time.perf_counter()
+            gen = backend.chat(
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                max_new_tokens=1024,
+                temperature=0.0,
+            )
+            latency_ms = (time.perf_counter() - start_t) * 1000.0
+            total_latency_ms += latency_ms
             total_tokens += gen.tokens_generated
 
-            code = extract_python_code(gen.text)
-            is_passed, p_cases, t_cases = run_evalplus_test(code, item["entry_point"], item["test_cases"])
+            extracted_code = extract_python_code(gen.text, entry_point=entry_point)
 
-            # In mock backend fallback
-            if not is_passed and item["entry_point"] in gen.text:
-                # Synthesize standard implementation for mock backend if needed
-                is_passed = True
-                p_cases = t_cases
+            # Build isolated test runner script
+            # Never expose hidden test in model prompt!
+            test_runner = f"""
+{hidden_test}
+check({entry_point})
+"""
+            is_passed, err_msg, exec_time = self.sandbox.run_code(extracted_code, test_runner)
 
             if is_passed:
                 passed += 1
+            else:
+                if "timed out" in err_msg.lower():
+                    error_categories["timeout"] += 1
+                elif "syntaxerror" in err_msg.lower():
+                    error_categories["syntax_error"] += 1
+                elif "assertionerror" in err_msg.lower():
+                    error_categories["assertion_error"] += 1
+                else:
+                    error_categories["runtime_error"] += 1
+
+            q_res = QuestionResult(
+                question_id=item.get("task_id", f"{self.subset}_{idx}"),
+                raw_prompt=prompt,
+                raw_response=gen.text,
+                extracted_answer=extracted_code,
+                expected_answer="Official expanded hidden tests pass",
+                is_correct=is_passed,
+                evaluation_error=None if is_passed else err_msg,
+                tokens_prompt=len(prompt.split()),
+                tokens_generated=gen.tokens_generated,
+                latency_ms=round(latency_ms, 2),
+            )
+            question_results.append(q_res)
 
             if on_sample:
-                on_sample({
-                    "task_id": self.task_id,
-                    "category": self.category,
-                    "sample_index": idx + 1,
-                    "total_samples": total,
-                    "prompt": item["prompt"],
-                    "response": gen.text,
-                    "passed": is_passed,
-                    "edge_cases_passed": f"{p_cases}/{t_cases}",
-                    "latency_ms": gen.latency_ms,
-                    "tokens": gen.tokens_generated,
-                })
+                on_sample(self.task_id, idx + 1, total, is_passed)
 
-            breakdown.append({
-                "id": item["id"],
-                "entry_point": item["entry_point"],
-                "passed": is_passed,
-                "passed_cases": p_cases,
-                "total_cases": t_cases,
-            })
+        pass_at_1 = (passed / total * 100.0) if total > 0 else 0.0
+        ci_lower, ci_upper = wilson_score_interval(passed, total)
 
-        acc = (passed / total) if total > 0 else 0.0
-        conf = compute_metric_confidence(passed, total)
+        avg_latency = total_latency_ms / max(1, total)
+        avg_tps = (total_tokens / (total_latency_ms / 1000.0)) if total_latency_ms > 0 else 0.0
 
         return TaskMetric(
             task_id=self.task_id,
             category=self.category,
-            raw_score=round(acc, 4),
-            raw_metric_name=self.raw_metric_name,
-            normalized_score=round(acc * 100.0, 2),
+            status=run_status,
+            raw_score=round(passed / max(1, total), 4),
+            raw_metric_name="pass@1",
+            normalized_score=round(pass_at_1, 2),
             total_samples=total,
             passed_samples=passed,
-            avg_latency_ms=round(total_latency / max(1, total), 2),
-            avg_tokens_per_sec=round(total_tokens / max(0.001, total_latency / 1000.0), 2),
+            failed_samples=total - passed,
+            invalid_responses=error_categories["syntax_error"],
+            ci_lower=ci_lower,
+            ci_upper=ci_upper,
+            dataset_name=f"evalplus/{self.subset}",
+            dataset_revision="v0.3.0",
+            split="test",
+            avg_latency_ms=round(avg_latency, 2),
+            avg_tokens_per_sec=round(avg_tps, 2),
             sub_metrics={
-                "confidence_interval": conf,
-                "details": breakdown,
+                "error_categories": error_categories,
+                "subset": self.subset,
             },
+            question_results=question_results,
         )
