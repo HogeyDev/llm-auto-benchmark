@@ -91,7 +91,7 @@ def evaluate(
     token: Optional[str] = typer.Option(None, "--token", envvar="GITHUB_TOKEN", help="GitHub Personal Access Token"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Dry-run mode"),
     notes: Optional[str] = typer.Option(None, "--notes", help="Optional notes on runner configuration or hardware offloading"),
-    reasoning_effort: Optional[str] = typer.Option(None, "--reasoning-effort", "--effort", help="Reasoning effort level (low, medium, high)"),
+    reasoning_effort: Optional[str] = typer.Option(None, "--reasoning-effort", "--effort", help="Reasoning effort level (model-dependent; none, minimal, low, medium, high, xhigh, max)"),
 ):
     """Run official benchmark evaluation suite on a single model and save standardized JSON (Schema 2.0.0)."""
     setup_logger()
@@ -629,7 +629,7 @@ def tui(
     endpoint_url: str = typer.Option("http://127.0.0.1:8000/v1", "--endpoint-url", "--endpoint", help="Server endpoint URL"),
     api_key: Optional[str] = typer.Option(None, "--api-key", envvar="OPENAI_API_KEY", help="API key"),
     quantization: str = typer.Option("BF16", "--quantization", "-q", help="Quantization method"),
-    reasoning_effort: str = typer.Option("low", "--reasoning-effort", "--effort", help="Reasoning effort level"),
+    reasoning_effort: str = typer.Option("low", "--reasoning-effort", "--effort", help="Default reasoning effort (model-dependent; none, minimal, low, medium, high, xhigh, max)"),
 ):
     """Launch the interactive Terminal User Interface (TUI) with real-time output verification."""
     from .tui import launch_tui

@@ -36,7 +36,7 @@ class ModelMetadata(BaseModel):
     license: Optional[str] = Field(None, description="Model license")
     backend: str = Field(..., description="Inference backend used for evaluation")
     backend_version: Optional[str] = Field(None, description="Version of the inference engine/library")
-    reasoning_effort: Optional[str] = Field(None, description="Reasoning effort level (e.g. low, medium, high)")
+    reasoning_effort: Optional[str] = Field(None, description="Reasoning effort level (none, minimal, low, medium, high, xhigh, or max; model-dependent)")
 
 
 class QuestionResult(BaseModel):

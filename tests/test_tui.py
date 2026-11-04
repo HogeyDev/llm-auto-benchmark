@@ -4,35 +4,72 @@ Tests for Textual Terminal User Interface (TUI).
 
 import asyncio
 import os
-from textual.widgets import Select, Button, Input, DataTable
-from slm_bench.tui import SLMBenchTUI
+import pytest
+from textual.containers import Container
+from textual.widgets import Select, Button, Input, Checkbox, DataTable
+from slm_bench.tui import SLMBenchTUI, REASONING_EFFORT_OPTIONS, _reasoning_effort_to_api
+from slm_bench.models.schema import BenchmarkResult, HardwareInfo, ModelMetadata
+
+
+def _make_result(eligible: bool) -> BenchmarkResult:
+    metadata = ModelMetadata(
+        model_id="test/model",
+        model_slug="test-model",
+        param_tier="3B-8B",
+        backend="mock",
+    )
+    hardware = HardwareInfo(os="TestOS", cpu="CPU", cpu_cores=4, total_ram_gb=16.0)
+    return BenchmarkResult(
+        schema_version="2.0.0",
+        evaluation_id="test-eval",
+        status="FULL" if eligible else "PARTIAL",
+        eligible_for_leaderboard=eligible,
+        model=metadata,
+        hardware=hardware,
+        tasks={},
+        categories={},
+        slm_index=80.0,
+    )
 
 
 def test_tui_initialization_and_mounting():
     """Verify that the TUI app mounts widgets and exposes all configuration controls."""
     async def _test():
-        # Ensure no leaked hardcoded default key
-        if "OPENAI_API_KEY" in os.environ:
-            del os.environ["OPENAI_API_KEY"]
-
-        app = SLMBenchTUI(
-            default_model="meta-llama/Llama-3.2-3B-Instruct",
-            default_quant="BF16",
-            default_effort="medium",
-        )
-        async with app.run_test() as pilot:
-            assert app.eval_in_progress is False
-            assert "sk_live_" not in app.default_api_key
-            assert app.query_one("#input-model", Input).value == "meta-llama/Llama-3.2-3B-Instruct"
-            assert app.query_one("#input-quant", Input).value == "BF16"
-            assert app.query_one("#select-profile", Select).value == "standard"
-            assert app.query_one("#btn-run", Button) is not None
-            assert app.query_one("#btn-stop", Button).disabled is True
-            assert app.query_one("#btn-test-conn", Button) is not None
-            assert app.query_one("#btn-submit", Button).disabled is True
-            assert app.query_one("#live-stream-box") is not None
-            assert app.query_one("#stream-log") is not None
-            assert app.query_one("#results-table", DataTable) is not None
+        # Ensure the test does not depend on or leak a caller's API key.
+        original_key = os.environ.get("OPENAI_API_KEY")
+        os.environ.pop("OPENAI_API_KEY", None)
+        try:
+            app = SLMBenchTUI(
+                default_model="meta-llama/Llama-3.2-3B-Instruct",
+                default_quant="BF16",
+                default_effort="medium",
+                default_output_dir="test-results",
+                default_seed=123,
+            )
+            async with app.run_test() as pilot:
+                assert app.eval_in_progress is False
+                assert "sk_live_" not in app.default_api_key
+                assert app.query_one("#input-model", Input).value == "meta-llama/Llama-3.2-3B-Instruct"
+                assert app.query_one("#input-quant", Input).value == "BF16"
+                assert app.query_one("#input-model-ram", Input).value == ""
+                assert app.query_one("#input-seed", Input).value == "123"
+                assert app.query_one("#input-output-dir", Input).value == "test-results"
+                assert app.query_one("#select-profile", Select).value == "standard"
+                assert app.query_one("#custom-tasks-container", Container).display is False
+                assert app.query_one("#chk-task-mmlu_pro", Checkbox).value is True
+                assert app.query_one("#chk-task-xstest", Checkbox).value is False
+                assert app.query_one("#btn-run", Button) is not None
+                assert app.query_one("#btn-stop", Button).disabled is True
+                assert app.query_one("#btn-test-conn", Button) is not None
+                assert app.query_one("#btn-submit", Button).disabled is True
+                assert app.query_one("#live-stream-box") is not None
+                assert app.query_one("#stream-log") is not None
+                assert app.query_one("#results-table", DataTable) is not None
+        finally:
+            if original_key is None:
+                os.environ.pop("OPENAI_API_KEY", None)
+            else:
+                os.environ["OPENAI_API_KEY"] = original_key
 
     asyncio.run(_test())
 
@@ -46,6 +83,71 @@ def test_tui_profile_selection():
             profile_sel.value = "extended"
             await pilot.pause()
             assert app.query_one("#select-profile", Select).value == "extended"
+            assert app.query_one("#custom-tasks-container", Container).display is False
+
+    asyncio.run(_test())
+
+
+def test_tui_custom_profile_shows_official_tasks():
+    """Verify the custom profile reveals only the official benchmark task controls."""
+    async def _test():
+        app = SLMBenchTUI()
+        async with app.run_test() as pilot:
+            profile_sel = app.query_one("#select-profile", Select)
+            profile_sel.value = "custom"
+            await pilot.pause()
+            assert app.query_one("#custom-tasks-container", Container).display is True
+            assert app.query_one("#chk-task-mmlu_pro", Checkbox).value is True
+            assert app.query_one("#chk-task-xstest", Checkbox).value is False
+
+    asyncio.run(_test())
+
+
+def test_tui_invalid_seed_does_not_start_evaluation():
+    """Verify invalid sampling seed is rejected before changing evaluation state."""
+    async def _test():
+        app = SLMBenchTUI()
+        async with app.run_test():
+            app.query_one("#input-seed", Input).value = "not-a-number"
+            app.start_evaluation()
+            assert app.eval_in_progress is False
+            assert app.query_one("#btn-run", Button).disabled is False
+
+    asyncio.run(_test())
+
+
+def test_tui_reasoning_effort_options_cover_common_levels():
+    """Verify TUI exposes common reasoning levels and preserves explicit values."""
+    values = [value for _, value in REASONING_EFFORT_OPTIONS]
+    assert values == ["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]
+    assert _reasoning_effort_to_api("default") is None
+    assert _reasoning_effort_to_api("none") == "none"
+    assert _reasoning_effort_to_api("xhigh") == "xhigh"
+    assert _reasoning_effort_to_api("max") == "max"
+
+
+def test_tui_reasoning_effort_aliases_are_normalized():
+    """Verify common alias spellings resolve to canonical effort values."""
+    assert SLMBenchTUI(default_effort="X-HIGH").default_effort == "xhigh"
+    assert SLMBenchTUI(default_effort="maximum").default_effort == "max"
+    assert SLMBenchTUI(default_effort="disabled").default_effort == "none"
+
+
+def test_tui_reasoning_effort_rejects_unknown_value():
+    """Verify unsupported reasoning values fail fast with a useful error."""
+    with pytest.raises(ValueError, match="Unsupported reasoning effort"):
+        SLMBenchTUI(default_effort="ultra-high")
+
+
+def test_tui_submission_requires_full_eligible_result():
+    """Verify the submission button follows FULL leaderboard eligibility."""
+    async def _test():
+        app = SLMBenchTUI()
+        async with app.run_test():
+            app._on_eval_finished(_make_result(eligible=False), "partial-result.json")
+            assert app.query_one("#btn-submit", Button).disabled is True
+            app._on_eval_finished(_make_result(eligible=True), "full-result.json")
+            assert app.query_one("#btn-submit", Button).disabled is False
 
     asyncio.run(_test())
 

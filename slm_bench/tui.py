@@ -13,8 +13,6 @@ Provides an easy-to-use graphical console with:
 """
 
 import os
-import sys
-import json
 import time
 import threading
 import urllib.request
@@ -45,9 +43,88 @@ from .models.metadata import fetch_hf_model_metadata
 from .models.memory_detector import auto_detect_model_ram_gb
 from .backends.registry import get_backend
 from .benchmarks.suite import BenchmarkSuite
-from .benchmarks.registry import EVALUATION_PROFILES, get_profile_tasks
+from .benchmarks.registry import EVALUATION_PROFILES
+from .models.schema import BenchmarkResult
 from .submission.git_manager import GitSubmissionManager
 from .submission.pr_manager import PullRequestManager
+from .utils.logger import setup_logger
+
+
+REASONING_EFFORT_OPTIONS = [
+    ("Backend / Model default", "default"),
+    ("None (no reasoning)", "none"),
+    ("Minimal (fastest)", "minimal"),
+    ("Low (efficient)", "low"),
+    ("Medium (balanced)", "medium"),
+    ("High (deep reasoning)", "high"),
+    ("XHigh (extended reasoning)", "xhigh"),
+    ("Max (maximum reasoning)", "max"),
+]
+_REASONING_EFFORT_ALIASES = {
+    "": "default",
+    "unset": "default",
+    "not-set": "default",
+    "notset": "default",
+    "null": "default",
+    "server-default": "default",
+    "model-default": "default",
+    "off": "none",
+    "disabled": "none",
+    "disable": "none",
+    "min": "minimal",
+    "x-high": "xhigh",
+    "extra-high": "xhigh",
+    "minimum": "minimal",
+    "maximum": "max",
+}
+_VALID_REASONING_EFFORTS = {value for _, value in REASONING_EFFORT_OPTIONS}
+
+
+def _canonical_reasoning_effort(value: Optional[str]) -> str:
+    """Normalize common reasoning-effort aliases to TUI select values."""
+    normalized = (value or "default").strip().lower().replace("_", "-").replace(" ", "-")
+    normalized = "-".join(normalized.split("-"))
+    normalized = _REASONING_EFFORT_ALIASES.get(normalized, normalized.replace("-", ""))
+    if normalized not in _VALID_REASONING_EFFORTS:
+        raise ValueError(
+            f"Unsupported reasoning effort '{value}'. Supported values: "
+            f"{', '.join(sorted(_VALID_REASONING_EFFORTS))}"
+        )
+    return normalized
+
+
+def _reasoning_effort_to_api(value: str) -> Optional[str]:
+    """Return the explicit OpenAI-compatible effort value, or None to omit it."""
+    return None if value == "default" else value
+
+OFFICIAL_TASK_OPTIONS = [
+    ("MMLU-Pro (Reasoning)", "mmlu_pro"),
+    ("GPQA Diamond (Reasoning)", "gpqa_diamond"),
+    ("BIG-Bench Hard (Reasoning)", "bbh"),
+    ("GSM8K (Mathematics)", "gsm8k"),
+    ("MATH-500 (Mathematics)", "math500"),
+    ("IFEval (Instruction)", "ifeval"),
+    ("EvalPlus (Coding)", "evalplus"),
+    ("LiveCodeBench (Coding)", "livecodebench"),
+    ("BFCL v4 (Tool Calling)", "bfcl"),
+    ("RULER (Long Context)", "ruler"),
+    ("XSTest (Safety)", "xstest"),
+]
+
+
+def _profile_label(profile: str) -> str:
+    tasks = EVALUATION_PROFILES.get(profile, [])
+    mode = "PARTIAL" if profile == "quick" else "FULL"
+    return f"{profile.capitalize()} ({len(tasks)} tasks - {mode})"
+
+
+def _default_results_dir() -> str:
+    if Path("website/data/results").exists():
+        return "website/data/results"
+    if Path("Website/data/results").exists():
+        return "Website/data/results"
+    return "data/results"
+
 
 
 MODEL_PRESETS = [
@@ -211,6 +288,21 @@ Screen {
     margin-bottom: 0;
 }
 
+#custom-tasks-container {
+    display: none;
+    background: #161b22;
+    border: solid #30363d;
+    padding: 1;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+#custom-tasks-title {
+    color: #58a6ff;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
 /* Modal styling */
 .modal-container {
     width: 60;
@@ -254,14 +346,20 @@ class HelpModalScreen(ModalScreen):
                 "  • [bold yellow]?[/bold yellow] or [bold yellow]h[/bold yellow] : Show this help screen\n"
                 "  • [bold yellow]q[/bold yellow] : Quit application\n\n"
                 "[bold cyan]Evaluation Profiles:[/bold cyan]\n"
-                "  • [bold yellow]Standard[/bold yellow] (Default): 6 tasks (MMLU-Pro, GPQA Diamond, BBH, GSM8K, MATH-500, IFEval)\n"
-                "  • [bold yellow]Quick[/bold yellow]: 5 core tasks (seeded subset) for rapid smoke testing\n"
-                "  • [bold yellow]Extended[/bold yellow]: 10 official benchmarks (Standard + EvalPlus, BFCL, RULER, XSTest)\n\n"
+                "  • [bold yellow]Quick[/bold yellow]: 5 sampled tasks (MMLU-Pro, GPQA Diamond, GSM8K, MATH-500, IFEval). Always PARTIAL and leaderboard-ineligible.\n"
+                "  • [bold yellow]Standard[/bold yellow] (Default): 6 full official datasets (MMLU-Pro, GPQA Diamond, BBH, GSM8K, MATH-500, IFEval)\n"
+                "  • [bold yellow]Extended[/bold yellow]: 10 full datasets (Standard plus EvalPlus, BFCL v4, RULER, XSTest)\n"
+                "  • [bold yellow]Custom[/bold yellow]: choose official task IDs and optionally set a seed-backed sample limit\n\n"
+                "[bold cyan]Reasoning Effort:[/bold cyan]\n"
+                "  • [bold yellow]Backend / Model default[/bold yellow] omits the effort field.\n"
+                "  • Common levels: none, minimal, low, medium, high, xhigh, max.\n"
+                "  • Level support is model-dependent; use your server's model-specific documentation.\n\n"
                 "[bold cyan]Scoring Tracks:[/bold cyan]\n"
-                "  • [bold green]General Intelligence (SLM-Index)[/bold green]: Coding (30%), Reasoning (25%), Instruction (25%), Tools (20%)\n"
+                "  • [bold green]General Intelligence (SLM-Index)[/bold green]: Standard uses Reasoning 35%, Mathematics 35%, Instruction 30%. Extended uses Reasoning 25%, Mathematics 25%, Instruction 20%, Coding 15%, Tool Calling 15%.\n"
                 "  • [bold green]Coding & Agentic Index[/bold green]: 60% Code synthesis + 40% Tool execution\n"
-                "  • [bold green]Local Efficiency[/bold green]: Score-per-GB RAM footprint + generation tokens/sec\n\n"
-                "[dim]Scores are saved to Website/data/results/<slug>.json and are ready for PR submission.[/dim]"
+                "  • [bold green]Local Efficiency[/bold green]: Score-per-GB RAM footprint + generation tokens/sec\n"
+                "  • [bold green]Safety[/bold green]: Reported separately and never counted in SLM-Index\n\n"
+                "[dim]Only FULL results are eligible for the official leaderboard. Results are saved to the Output Directory and must pass schema and eligibility checks before PR submission.[/dim]"
             )
             yield Static(help_text)
             with Horizontal(classes="modal-actions"):
@@ -340,6 +438,8 @@ class SLMBenchTUI(App):
         default_api_key: Optional[str] = None,
         default_effort: str = "low",
         default_quant: str = "INT4",
+        default_output_dir: Optional[str] = None,
+        default_seed: int = 42,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -347,8 +447,10 @@ class SLMBenchTUI(App):
         self.default_backend = default_backend
         self.default_endpoint = default_endpoint
         self.default_api_key = default_api_key or os.environ.get("OPENAI_API_KEY", "")
-        self.default_effort = default_effort
+        self.default_effort = _canonical_reasoning_effort(default_effort)
         self.default_quant = default_quant
+        self.default_output_dir = default_output_dir or _default_results_dir()
+        self.default_seed = default_seed
 
         # Detected Hardware
         self.hw = get_hardware_info()
@@ -394,6 +496,9 @@ class SLMBenchTUI(App):
                 yield Label("Quantization:", classes="section-label")
                 yield Input(value=self.default_quant, placeholder="e.g. INT4, BF16, AWQ_4BIT", id="input-quant")
 
+                yield Label("Model RAM / VRAM (GB, optional):", classes="section-label")
+                yield Input(value="", placeholder="Leave blank to auto-detect or estimate", id="input-model-ram")
+
                 yield Label("Inference Backend:", classes="section-label")
                 yield Select(
                     [
@@ -413,14 +518,9 @@ class SLMBenchTUI(App):
                 yield Label("API Key:", classes="section-label")
                 yield Input(value=self.default_api_key, placeholder="(Optional for local backends)", password=True, id="input-apikey")
 
-                yield Label("Reasoning Effort:", classes="section-label")
+                yield Label("Reasoning Effort (level support is model-dependent):", classes="section-label")
                 yield Select(
-                    [
-                        ("low (Fast thinking)", "low"),
-                        ("medium (Balanced)", "medium"),
-                        ("high (Deep reasoning)", "high"),
-                        ("none (Disabled)", "none"),
-                    ],
+                    REASONING_EFFORT_OPTIONS,
                     value=self.default_effort,
                     id="select-effort",
                 )
@@ -428,10 +528,10 @@ class SLMBenchTUI(App):
                 yield Label("Evaluation Profile:", classes="section-label")
                 yield Select(
                     [
-                        ("Standard (Default - 8 Benchmarks)", "standard"),
-                        ("Quick (Smoke Check - 4 Core Tasks)", "quick"),
-                        ("Extended (Full Suite - 15 Academic Adapters)", "extended"),
-                        ("Custom Selection", "custom"),
+                        (_profile_label("standard"), "standard"),
+                        (_profile_label("quick"), "quick"),
+                        (_profile_label("extended"), "extended"),
+                        ("Custom (Choose Official Tasks)", "custom"),
                     ],
                     value="standard",
                     id="select-profile",
@@ -450,11 +550,19 @@ class SLMBenchTUI(App):
                     id="select-limit",
                 )
 
-                yield Label("Custom Evaluation Tasks:", classes="section-label")
-                yield Checkbox("Reasoning & Math", value=True, id="chk-reasoning", classes="task-checkbox")
-                yield Checkbox("Agentic Coding", value=True, id="chk-coding", classes="task-checkbox")
-                yield Checkbox("Instruction Following", value=True, id="chk-instruction", classes="task-checkbox")
-                yield Checkbox("Tool Calling", value=True, id="chk-tools", classes="task-checkbox")
+                yield Label("Sampling Seed:", classes="section-label")
+                yield Input(value=str(self.default_seed), placeholder="42", id="input-seed")
+
+                yield Label("Output Directory:", classes="section-label")
+                yield Input(value=self.default_output_dir, placeholder="data/results", id="input-output-dir")
+
+                yield Label("Evaluation Notes:", classes="section-label")
+                yield Input(value="", placeholder="Optional notes (overrides auto-generated notes)", id="input-notes")
+
+                with Container(id="custom-tasks-container"):
+                    yield Label("Official Custom Tasks:", id="custom-tasks-title")
+                    for label, task_id in OFFICIAL_TASK_OPTIONS:
+                        yield Checkbox(label, value=task_id in EVALUATION_PROFILES["standard"], id=f"chk-task-{task_id}", classes="task-checkbox")
 
                 yield Button("▶  Start Evaluation", variant="success", id="btn-run")
                 yield Button("⏹  Stop", variant="error", id="btn-stop", disabled=True)
@@ -484,17 +592,24 @@ class SLMBenchTUI(App):
 
     def on_mount(self) -> None:
         """Initialize UI widgets upon mount."""
+        self._set_custom_tasks_visibility(str(self.query_one("#select-profile", Select).value) == "custom")
         log = self.query_one("#stream-log", RichLog)
         log.write("[bold green]Welcome to SLM-Bench Interactive Studio![/bold green]")
         log.write("[dim]Configure your model and server on the left, then click 'Start Evaluation' (or press 'r').[/dim]")
         log.write("[dim]Press '?' or 'h' for shortcuts and help.[/dim]")
 
     def on_select_changed(self, event: Select.Changed) -> None:
-        """Update model input field when a preset is selected."""
+        """Update model input and custom task panel visibility."""
         if event.select.id == "select-preset":
             val = str(event.value)
             if val != "custom":
                 self.query_one("#input-model", Input).value = val
+        elif event.select.id == "select-profile":
+            self._set_custom_tasks_visibility(str(event.value) == "custom")
+
+    def _set_custom_tasks_visibility(self, visible: bool) -> None:
+        """Show or hide the official custom task checkbox panel."""
+        self.query_one("#custom-tasks-container").display = visible
 
     def action_run_eval(self) -> None:
         """Trigger evaluation action."""
@@ -587,6 +702,14 @@ class SLMBenchTUI(App):
         """Open the GitHub Pull Request submission modal."""
         if not self.last_result or not self.last_result_path:
             return
+        if not self.last_result.eligible_for_leaderboard:
+            self._update_status(
+                f"[bold yellow]Result status is {self.last_result.status}; only FULL eligible results can be submitted to the official leaderboard.[/bold yellow]"
+            )
+            self._log_info(
+                f"[bold yellow]Submission blocked:[/bold yellow] Status {self.last_result.status} is not leaderboard-eligible."
+            )
+            return
 
         def handle_submission(submission_data: Optional[Dict[str, Any]]) -> None:
             if submission_data:
@@ -608,12 +731,16 @@ class SLMBenchTUI(App):
         token = submission_data.get("token")
         dry_run = submission_data.get("dry_run", False)
         res_path = Path(submission_data["result_path"])
-        model_slug = submission_data["model_slug"]
-        slm_index = submission_data["slm_index"]
 
         self.call_from_thread(self._update_status, "[bold yellow]Submitting results to GitHub...[/bold yellow]")
         try:
             json_content = res_path.read_text(encoding="utf-8")
+            result = BenchmarkResult.model_validate_json(json_content)
+            if not result.eligible_for_leaderboard:
+                raise ValueError(
+                    f"Result status is {result.status}; only FULL eligible results can be published to the official leaderboard."
+                )
+            model_slug = result.model.model_slug
             repo_url = f"https://github.com/{repo}.git" if not repo.startswith("http") else repo
 
             git_mgr = GitSubmissionManager(repo_url=repo_url, token=token, dry_run=dry_run)
@@ -621,18 +748,12 @@ class SLMBenchTUI(App):
             branch_name = git_mgr.commit_and_push(
                 model_slug=model_slug,
                 json_content=json_content,
-                slm_index=slm_index,
+                slm_index=result.slm_index,
             )
 
-            pr_url = None
-            if not dry_run:
-                pr_mgr = PullRequestManager(github_repo=repo, token=token)
-                pr_url = pr_mgr.create_pr(
-                    branch_name=branch_name,
-                    model_slug=model_slug,
-                    slm_index=slm_index,
-                    is_update=git_mgr.is_update,
-                )
+            pr_mgr = PullRequestManager(repo_identifier=repo, token=token, dry_run=dry_run)
+            pr_info = pr_mgr.create_pull_request(branch_name=branch_name, result=result)
+            pr_url = pr_info.get("pr_url")
 
             self.call_from_thread(self._on_submit_finished, pr_url, dry_run, branch_name)
         except Exception as e:
@@ -646,10 +767,14 @@ class SLMBenchTUI(App):
             lbl.update(f"[bold green]✓ Dry-run completed![/bold green] Branch: [cyan]{branch_name}[/cyan]")
             log.write(f"[bold green]✓ Dry-run submission completed successfully![/bold green]")
             log.write(f"Validated JSON schema and git branch: [bold cyan]{branch_name}[/bold cyan]")
+            if pr_url:
+                log.write(f"Simulated Pull Request: [bold cyan]{pr_url}[/bold cyan]")
         else:
             lbl.update(f"[bold green]✓ Pull Request Created![/bold green] {pr_url}")
             log.write(f"[bold green]🚀 PULL REQUEST OPENED SUCCESSFULLY![/bold green]")
-            log.write(f"Leaderboard PR URL: [bold cyan]{pr_url}[/bold cyan]")
+            if pr_url:
+                log.write(f"Leaderboard PR URL: [bold cyan]{pr_url}[/bold cyan]")
+        self.query_one("#btn-submit", Button).disabled = True
 
     def _on_submit_error(self, err_msg: str) -> None:
         """Handle submission failure."""
@@ -658,10 +783,63 @@ class SLMBenchTUI(App):
         log = self.query_one("#stream-log", RichLog)
         log.write(f"[bold red]✗ PR Submission Error:[/bold red] {err_msg}")
 
+    def _form_error(self, message: str) -> None:
+        """Surface a validation error without starting an evaluation."""
+        self.query_one("#lbl-status", Label).update(f"[bold red]{message}[/bold red]")
+        self.query_one("#live-stream-box", Static).update(f"[bold red]✖ {message}[/bold red]")
+        self.query_one("#stream-log", RichLog).write(f"[bold red]✖ Input error:[/bold red] {message}")
+
     def start_evaluation(self) -> None:
         """Start benchmark run in background worker thread."""
         if self.eval_in_progress:
             return
+
+        # Read and validate form configuration before changing UI state.
+        model_id = self.query_one("#input-model", Input).value.strip() or self.default_model
+        quantization = self.query_one("#input-quant", Input).value.strip() or self.default_quant
+        backend_name = str(self.query_one("#select-backend", Select).value)
+        endpoint_url = self.query_one("#input-endpoint", Input).value.strip() or self.default_endpoint
+        api_key = self.query_one("#input-apikey", Input).value.strip() or self.default_api_key
+        effort_val = str(self.query_one("#select-effort", Select).value)
+        effort = _reasoning_effort_to_api(effort_val)
+
+        ram_text = self.query_one("#input-model-ram", Input).value.strip()
+        model_ram_gb = None
+        if ram_text:
+            try:
+                model_ram_gb = float(ram_text)
+                if model_ram_gb <= 0:
+                    raise ValueError
+            except ValueError:
+                self._form_error("Model RAM / VRAM must be a positive number of GB.")
+                return
+
+        try:
+            seed_text = self.query_one("#input-seed", Input).value.strip()
+            seed = int(seed_text) if seed_text else self.default_seed
+        except ValueError:
+            self._form_error("Sampling seed must be a whole number.")
+            return
+
+        output_dir = self.query_one("#input-output-dir", Input).value.strip() or self.default_output_dir
+        notes = self.query_one("#input-notes", Input).value.strip() or None
+
+        limit_val = str(self.query_one("#select-limit", Select).value)
+        sample_limit = None if limit_val in ("all", "default") else int(limit_val)
+
+        profile_val = str(self.query_one("#select-profile", Select).value)
+        profile = None if profile_val == "custom" else profile_val
+
+        selected_tasks = None
+        if profile_val == "custom":
+            selected_tasks = [
+                task_id
+                for _, task_id in OFFICIAL_TASK_OPTIONS
+                if self.query_one(f"#chk-task-{task_id}", Checkbox).value
+            ]
+            if not selected_tasks:
+                self._form_error("Select at least one official benchmark for a custom evaluation.")
+                return
 
         self.eval_in_progress = True
         self.cancel_event.clear()
@@ -681,35 +859,6 @@ class SLMBenchTUI(App):
         status_lbl = self.query_one("#lbl-status", Label)
         status_lbl.update("[bold yellow]Initializing benchmark backend and model metadata...[/bold yellow]")
 
-        # Read form configuration
-        model_id = self.query_one("#input-model", Input).value.strip() or self.default_model
-        quantization = self.query_one("#input-quant", Input).value.strip() or self.default_quant
-        backend_name = str(self.query_one("#select-backend", Select).value)
-        endpoint_url = self.query_one("#input-endpoint", Input).value.strip() or self.default_endpoint
-        api_key = self.query_one("#input-apikey", Input).value.strip() or self.default_api_key
-        effort_val = str(self.query_one("#select-effort", Select).value)
-        effort = None if effort_val == "none" else effort_val
-
-        limit_val = str(self.query_one("#select-limit", Select).value)
-        sample_limit = None if limit_val in ("all", "default") else int(limit_val)
-
-        profile_val = str(self.query_one("#select-profile", Select).value)
-        profile = None if profile_val == "custom" else profile_val
-
-        selected_tasks = None
-        if profile_val == "custom":
-            selected_tasks = []
-            if self.query_one("#chk-reasoning", Checkbox).value:
-                selected_tasks.append("reasoning")
-            if self.query_one("#chk-coding", Checkbox).value:
-                selected_tasks.append("coding")
-            if self.query_one("#chk-instruction", Checkbox).value:
-                selected_tasks.append("instruction")
-            if self.query_one("#chk-tools", Checkbox).value:
-                selected_tasks.append("tool_calling")
-            if not selected_tasks:
-                selected_tasks = ["reasoning"]
-
         # Run worker
         self.run_eval_worker(
             model_id=model_id,
@@ -718,6 +867,10 @@ class SLMBenchTUI(App):
             endpoint_url=endpoint_url,
             api_key=api_key,
             reasoning_effort=effort,
+            model_ram_gb=model_ram_gb,
+            output_dir=output_dir,
+            seed=seed,
+            notes=notes,
             profile=profile,
             sample_limit=sample_limit,
             selected_tasks=selected_tasks,
@@ -745,6 +898,10 @@ class SLMBenchTUI(App):
         endpoint_url: str,
         api_key: str,
         reasoning_effort: Optional[str],
+        model_ram_gb: Optional[float],
+        output_dir: str,
+        seed: int,
+        notes: Optional[str],
         profile: Optional[str],
         sample_limit: Optional[int],
         selected_tasks: Optional[List[str]],
@@ -755,7 +912,12 @@ class SLMBenchTUI(App):
                 raise InterruptedError("Evaluation cancelled before start.")
 
             # 1. Fetch metadata
-            meta = fetch_hf_model_metadata(model_id, quantization=quantization, backend=backend_name)
+            meta = fetch_hf_model_metadata(
+                model_id,
+                quantization=quantization,
+                backend=backend_name,
+                model_ram_gb=model_ram_gb,
+            )
             if reasoning_effort:
                 meta.reasoning_effort = reasoning_effort
 
@@ -771,6 +933,7 @@ class SLMBenchTUI(App):
                 quantization=quantization,
                 endpoint_url=endpoint_url,
                 api_key=api_key,
+                model_ram_gb=meta.model_ram_gb,
                 reasoning_effort=reasoning_effort,
             )
 
@@ -784,18 +947,20 @@ class SLMBenchTUI(App):
             if self.cancel_event.is_set():
                 raise InterruptedError("Evaluation cancelled after backend loading.")
 
-            # Auto-detect RAM
-            detected_ram = auto_detect_model_ram_gb(
-                backend_instance=backend,
-                backend_name=backend_name,
-                model_id=model_id,
-                quantization=quantization,
-                param_count_b=meta.param_count_b,
-                endpoint_url=endpoint_url if backend_name == "openai" else None,
-            )
-            if detected_ram:
-                meta.model_ram_gb = detected_ram
-                hw.model_ram_gb = detected_ram
+            # Auto-detect RAM only when the user did not provide a footprint
+            endpoint_backends = ("openai", "openai_compatible", "openai-compatible", "ollama", "lmstudio", "endpoint", "localai")
+            if model_ram_gb is None:
+                detected_ram = auto_detect_model_ram_gb(
+                    backend_instance=backend,
+                    backend_name=backend_name,
+                    model_id=model_id,
+                    quantization=quantization,
+                    param_count_b=meta.param_count_b,
+                    endpoint_url=endpoint_url if backend_name.lower() in endpoint_backends else None,
+                )
+                if detected_ram:
+                    meta.model_ram_gb = detected_ram
+                    hw.model_ram_gb = detected_ram
 
             # Generate auto notes
             notes = generate_auto_system_notes(
@@ -803,11 +968,14 @@ class SLMBenchTUI(App):
                 backend_name=backend_name,
                 endpoint_url=endpoint_url,
                 server_runtime=getattr(backend, "server_runtime", None),
+                user_notes=notes,
             )
 
             # 3. Setup hooks for suite execution
             suite = BenchmarkSuite()
             resolved_tasks = suite.resolve_tasks(selected_tasks=selected_tasks, profile=profile)
+            if not resolved_tasks:
+                raise ValueError("No recognized benchmark tasks were resolved. Check your custom task selection.")
             total_tasks_count = len(resolved_tasks)
             current_task_idx = [0]
 
@@ -837,17 +1005,14 @@ class SLMBenchTUI(App):
                 on_task_complete=on_task_complete,
                 show_progress=False,
                 cancel_event=self.cancel_event,
+                seed=seed,
             )
 
             if self.cancel_event.is_set():
                 raise InterruptedError("Evaluation cancelled during benchmark execution.")
 
-            # 4. Save result (prefer Website/data/results if exists, else data/results)
-            out_dir = Path("data/results")
-            if Path("Website/data/results").exists():
-                out_dir = Path("Website/data/results")
-            elif Path("website/data/results").exists():
-                out_dir = Path("website/data/results")
+            # 4. Save result to the selected output directory
+            out_dir = Path(output_dir)
             out_dir.mkdir(parents=True, exist_ok=True)
             res_file = out_dir / f"{meta.model_slug}.json"
             res_file.write_text(result.model_dump_json(indent=2), encoding="utf-8")
@@ -954,22 +1119,32 @@ class SLMBenchTUI(App):
         self.last_result = result
         self.last_result_path = file_path
 
+        status = getattr(result, "status", "UNKNOWN")
+        eligible = bool(getattr(result, "eligible_for_leaderboard", False))
         self.query_one("#btn-run", Button).disabled = False
         self.query_one("#btn-stop", Button).disabled = True
-        self.query_one("#btn-submit", Button).disabled = False
+        self.query_one("#btn-submit", Button).disabled = not eligible
 
         pbar = self.query_one("#progress-bar", ProgressBar)
         pbar.progress = 100
 
         lbl = self.query_one("#lbl-status", Label)
-        lbl.update(f"[bold green]✓ Complete![/bold green] Composite SLM-Index: [bold yellow]{result.slm_index:.2f}%[/bold yellow] | Saved: [cyan]{file_path}[/cyan]")
+        lbl.update(
+            f"[bold green]✓ Complete![/bold green] Status: [bold]{status}[/bold] | "
+            f"SLM-Index: [bold yellow]{result.slm_index:.2f}%[/bold yellow] | Saved: [cyan]{file_path}[/cyan]"
+        )
 
         live_box = self.query_one("#live-stream-box", Static)
-        live_box.update(f"[bold green]✓ Evaluation completed![/bold green] Composite SLM-Index: [bold yellow]{result.slm_index:.2f}%[/bold yellow]")
+        eligibility_text = "eligible" if eligible else "not leaderboard-eligible"
+        live_box.update(
+            f"[bold {'green' if eligible else 'yellow'}]✓ Evaluation completed![/bold {'green' if eligible else 'yellow'}] "
+            f"Status: [bold]{status}[/bold] | SLM-Index: [bold yellow]{result.slm_index:.2f}%[/bold yellow] ({eligibility_text})"
+        )
 
         log = self.query_one("#stream-log", RichLog)
         log.write(f"[bold green]════════════════════════════════════════════════════════════════════════════[/bold green]")
         log.write(f"[bold green]✓ BENCHMARK COMPLETED SUCCESSFULLY![/bold green]")
+        log.write(f"Evaluation Status: [bold yellow]{status}[/bold yellow] | Eligible for Leaderboard: [bold]{eligible}[/bold]")
         log.write(f"Evaluation Profile: [bold yellow]{(result.profile or 'standard').upper()}[/bold yellow]")
         log.write(f"General Intelligence (SLM-Index): [bold yellow]{result.slm_index:.2f}%[/bold yellow]")
         if result.coding_agentic_index is not None:
@@ -979,6 +1154,12 @@ class SLMBenchTUI(App):
             pts_gb = eff.get("score_per_gb", "N/A")
             tps = eff.get("tokens_per_sec", "N/A")
             log.write(f"Local Efficiency: [bold magenta]{pts_gb} pts/GB RAM | {tps} tok/s[/bold magenta]")
+        if eligible:
+            log.write("[bold green]Result is FULL and eligible for official leaderboard submission.[/bold green]")
+        else:
+            log.write(
+                f"[bold yellow]Result status is {status}; official leaderboard submission is blocked.[/bold yellow]"
+            )
         log.write(f"Standardized Result JSON: [bold cyan]{file_path}[/bold cyan]")
         log.write(f"[bold green]════════════════════════════════════════════════════════════════════════════[/bold green]")
 
@@ -987,6 +1168,9 @@ class SLMBenchTUI(App):
         self.eval_in_progress = False
         self.query_one("#btn-run", Button).disabled = False
         self.query_one("#btn-stop", Button).disabled = True
+        self.query_one("#btn-submit", Button).disabled = not bool(
+            self.last_result and getattr(self.last_result, "eligible_for_leaderboard", False)
+        )
 
         lbl = self.query_one("#lbl-status", Label)
         lbl.update("[bold yellow]Evaluation cancelled by user.[/bold yellow]")
@@ -1002,6 +1186,9 @@ class SLMBenchTUI(App):
         self.eval_in_progress = False
         self.query_one("#btn-run", Button).disabled = False
         self.query_one("#btn-stop", Button).disabled = True
+        self.query_one("#btn-submit", Button).disabled = not bool(
+            self.last_result and getattr(self.last_result, "eligible_for_leaderboard", False)
+        )
 
         lbl = self.query_one("#lbl-status", Label)
         lbl.update(f"[bold red]Error: {err_msg}[/bold red]")
@@ -1015,5 +1202,6 @@ class SLMBenchTUI(App):
 
 def launch_tui(**kwargs) -> None:
     """Launch the interactive SLM-Bench TUI application."""
+    setup_logger()
     app = SLMBenchTUI(**kwargs)
     app.run()
