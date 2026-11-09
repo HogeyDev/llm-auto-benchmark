@@ -9,7 +9,7 @@ from slm_bench.benchmarks.registry import (
     get_task,
     list_available_tasks,
     get_profile_tasks,
-    get_profile_sample_limit,
+    get_profile_sample_limits,
     BENCHMARK_REGISTRY,
     EVALUATION_PROFILES,
 )
@@ -77,12 +77,33 @@ def test_evaluation_profiles():
 
 
 def test_profile_sample_limits():
-    assert get_profile_sample_limit("quick") == 5
-    assert get_profile_sample_limit("small") == 25
-    assert get_profile_sample_limit("medium") == 100
-    assert get_profile_sample_limit("standard") is None
-    assert get_profile_sample_limit("extended") is None
-    assert get_profile_sample_limit(None) is None
+    quick = get_profile_sample_limits("quick")
+    small = get_profile_sample_limits("small")
+    medium = get_profile_sample_limits("medium")
+
+    assert sum(quick.values()) == 25
+    assert sum(small.values()) == 1000
+    assert sum(medium.values()) == 10000
+
+    assert small == {
+        "mmlu_pro": 167,
+        "gpqa_diamond": 167,
+        "bbh": 167,
+        "gsm8k": 167,
+        "math500": 166,
+        "ifeval": 166,
+    }
+    assert medium == {
+        "mmlu_pro": 3721,
+        "gpqa_diamond": 198,
+        "bbh": 3721,
+        "gsm8k": 1319,
+        "math500": 500,
+        "ifeval": 541,
+    }
+    assert get_profile_sample_limits("standard") is None
+    assert get_profile_sample_limits("extended") is None
+    assert get_profile_sample_limits(None) is None
 
 
 def test_small_and_medium_are_partial_and_ineligible():
@@ -125,8 +146,12 @@ def test_small_profile_applies_sample_limit():
     assert result.status == "PARTIAL"
     assert result.eligible_for_leaderboard is False
     assert len(result.tasks) == 6
-    for metric in result.tasks.values():
-        assert metric.total_samples == 25
+    assert sum(metric.total_samples for metric in result.tasks.values()) == 1000
+    assert result.tasks["mmlu_pro"].total_samples == 167
+    assert result.tasks["bbh"].total_samples == 167
+    assert result.tasks["gpqa_diamond"].total_samples == 167
+    assert result.tasks["math500"].total_samples == 166
+    assert result.tasks["ifeval"].total_samples == 166
 
 
 def test_explicit_sample_limit_overrides_profile_default():

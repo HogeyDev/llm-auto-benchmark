@@ -47,10 +47,10 @@ The evaluation suite supports five tiers, from a harness smoke test to the full 
    - 5 samples per task across MMLU-Pro, GPQA Diamond, GSM8K, MATH-500, and IFEval (25 total).
    - Status: Always labeled **`PARTIAL`**. Ineligible for the official leaderboard.
 2. **`small`** (Sanity Check):
-   - 25 samples per task across the six standard tasks, including BBH (150 total).
+   - 1,000 samples total, split evenly across the six standard tasks (≈167 each), including BBH.
    - Status: Always labeled **`PARTIAL`**. Ineligible for the official leaderboard.
 3. **`medium`** (Smell Test):
-   - 100 samples per task across the six standard tasks, including BBH (600 total).
+   - 10,000 samples total: full splits for GPQA (198), MATH-500 (500), IFEval (541), and GSM8K (1,319), plus 3,721 each for MMLU-Pro and BBH.
    - Status: Always labeled **`PARTIAL`**. Ineligible for the official leaderboard.
 4. **`standard`** (Core Official Leaderboard):
    - Full official test splits across core general intelligence pillars.

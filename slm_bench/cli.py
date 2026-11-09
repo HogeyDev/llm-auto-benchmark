@@ -20,7 +20,7 @@ from .models.memory_detector import auto_detect_model_ram_gb
 from .models.schema import BenchmarkResult, TaskMetric
 from .backends.registry import get_backend
 from .benchmarks.suite import BenchmarkSuite
-from .benchmarks.registry import BENCHMARK_REGISTRY, EVALUATION_PROFILES, get_task, list_available_tasks, get_profile_sample_limit
+from .benchmarks.registry import BENCHMARK_REGISTRY, EVALUATION_PROFILES, get_task, list_available_tasks, get_profile_sample_limits
 from .datasets.manager import DatasetManager, BENCHMARK_DATASET_META
 from .submission.git_manager import GitSubmissionManager
 from .submission.pr_manager import PullRequestManager
@@ -190,9 +190,10 @@ def evaluate(
         d_name = d_meta.get("name", tobj.task_id)
         d_rev = d_meta.get("revision", "official")
         d_split = d_meta.get("split", "test")
-        profile_limit = get_profile_sample_limit(profile) if not task_list else None
-        q_count = str(sample_limit or profile_limit or d_meta.get("expected_count", "Full"))
-        p_mode = "PARTIAL (Sampled)" if (sample_limit or profile_limit) else "FULL (Official Split)"
+        profile_limits = get_profile_sample_limits(profile) if not task_list else {}
+        task_limit = sample_limit if sample_limit is not None else (profile_limits or {}).get(tobj.task_id)
+        q_count = str(task_limit or d_meta.get("expected_count", "Full"))
+        p_mode = "PARTIAL (Sampled)" if task_limit else "FULL (Official Split)"
         banner_table.add_row(d_name, d_meta.get("source", "Official upstream"), d_rev, d_split, q_count, p_mode)
     console.print(banner_table)
 
@@ -302,8 +303,8 @@ def list_benchmarks_cmd():
     p_table.add_column("Status Output", style="yellow")
     p_table.add_column("Tasks Included")
     p_table.add_row("QUICK", "PARTIAL", "5 samples/task for harness smoke testing (5 tasks: MMLU-Pro, GPQA, GSM8K, MATH-500, IFEval)")
-    p_table.add_row("SMALL", "PARTIAL", "25 samples/task sanity check (6 standard tasks incl. BBH)")
-    p_table.add_row("MEDIUM", "PARTIAL", "100 samples/task smell test (6 standard tasks incl. BBH)")
+    p_table.add_row("SMALL", "PARTIAL", "1,000 samples total, split evenly across the 6 standard tasks incl. BBH")
+    p_table.add_row("MEDIUM", "PARTIAL", "10,000 samples total: full small splits + 3,721 each for MMLU-Pro and BBH")
     p_table.add_row("STANDARD", "FULL", "Complete official datasets for core reasoning, math, and instruction (MMLU-Pro, GPQA, BBH, GSM8K, MATH-500, IFEval)")
     p_table.add_row("EXTENDED", "FULL", "Standard + EvalPlus (Docker sandbox), BFCL v4, RULER, XSTest")
     console.print(p_table)

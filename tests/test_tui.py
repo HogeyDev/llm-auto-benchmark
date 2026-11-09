@@ -246,6 +246,6 @@ def test_tui_profile_labels_include_small_and_medium():
 
     assert "PARTIAL" in _profile_label("small")
     assert "PARTIAL" in _profile_label("medium")
-    assert "6 tasks" in _profile_label("small")
-    assert "6 tasks" in _profile_label("medium")
+    assert "1,000" in _profile_label("small")
+    assert "10,000" in _profile_label("medium")
 
