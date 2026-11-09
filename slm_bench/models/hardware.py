@@ -6,6 +6,7 @@ import platform
 import psutil
 import subprocess
 import re
+from pathlib import Path
 from typing import Optional
 from .schema import HardwareInfo
 
@@ -126,6 +127,121 @@ def generate_auto_system_notes(
     return " ".join(parts).strip()
 
 
+def _parse_vulkaninfo_devices(text: str) -> list:
+    """Extract device name and driver from ``vulkaninfo --summary`` output."""
+    devices = []
+    current = None
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        key, separator, value = line.partition("=")
+        if not separator:
+            continue
+        key = key.strip()
+        value = value.strip()
+        if key == "deviceName":
+            if current and current["name"]:
+                devices.append(current)
+            current = {"name": value, "driver": None}
+        elif key == "driverInfo" and current is not None:
+            current["driver"] = value or None
+    if current and current["name"]:
+        devices.append(current)
+    return devices
+
+
+def _select_vulkan_device(devices: list) -> Optional[dict]:
+    """Pick the first hardware GPU, skipping CPU/software Vulkan devices."""
+    ignored = ("ryzen", "raphael", "cpu", "llvmpipe", "lavapipe")
+    for device in devices:
+        if not any(token in device["name"].lower() for token in ignored):
+            return device
+    return devices[0] if devices else None
+
+
+def _parse_sysfs_amd_cards(root: Path) -> list:
+    """Return AMD cards under a sysfs DRM root, largest VRAM first."""
+    cards = []
+    for device_path in root.glob("card*/device"):
+        try:
+            vendor = (device_path / "vendor").read_text(encoding="utf-8").strip().lower()
+            if vendor != "0x1002":
+                continue
+            try:
+                vram_bytes = int((device_path / "mem_info_vram_total").read_text(encoding="utf-8").strip())
+            except (OSError, ValueError):
+                vram_bytes = 0
+            cards.append({
+                "pci_slot": device_path.resolve().name,
+                "vram_gb": round(vram_bytes / (1024 ** 3), 2),
+            })
+        except OSError:
+            continue
+    return sorted(cards, key=lambda card: card["vram_gb"], reverse=True)
+
+
+def _parse_lspci_names(text: str) -> dict:
+    """Map PCI slots to cleaned device names from ``lspci -D -mm -nn`` output."""
+    names = {}
+    id_suffix = re.compile(r"\s*\[[0-9a-fA-F]{4}(?::[0-9a-fA-F]{4})?\]\s*$")
+    for line in text.splitlines():
+        quoted = re.findall(r'"([^"]*)"', line)
+        if len(quoted) < 3:
+            continue
+        slot = line.split(None, 1)[0]
+        names[slot] = id_suffix.sub("", quoted[2]).strip()
+    return names
+
+
+def _detect_amd_linux() -> Optional[dict]:
+    """Detect an AMD GPU on Linux via sysfs, with Vulkan/lspci name fallbacks."""
+    cards = _parse_sysfs_amd_cards(Path("/sys/class/drm"))
+    if not cards:
+        return None
+
+    selected = None
+    try:
+        proc = subprocess.run(
+            ["vulkaninfo", "--summary"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+        if proc.returncode == 0 and proc.stdout:
+            selected = _select_vulkan_device(_parse_vulkaninfo_devices(proc.stdout))
+    except Exception:
+        selected = None
+
+    name = selected["name"] if selected else None
+    if not name:
+        try:
+            proc = subprocess.run(
+                ["lspci", "-D", "-mm", "-nn"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                check=False,
+            )
+            if proc.returncode == 0 and proc.stdout:
+                name = _parse_lspci_names(proc.stdout).get(cards[0]["pci_slot"])
+        except Exception:
+            name = None
+
+    return {
+        "name": name or "AMD Radeon GPU",
+        "count": len(cards),
+        "vram_gb": cards[0]["vram_gb"],
+        "driver": selected["driver"] if selected else None,
+    }
+
+
+def _detect_amd_gpu() -> Optional[dict]:
+    """Detect an AMD GPU on supported platforms; None when nothing is found."""
+    if platform.system() == "Linux":
+        return _detect_amd_linux()
+    return None
+
+
 def get_hardware_info(model_ram_gb: Optional[float] = None) -> HardwareInfo:
     """Collect host hardware and system specifications."""
     # OS & CPU
@@ -237,6 +353,14 @@ def get_hardware_info(model_ram_gb: Optional[float] = None) -> HardwareInfo:
                         gpu_vram_gb = round(total_mib / 1024, 2)
         except Exception:
             pass
+
+    if not gpu_name:
+        amd = _detect_amd_gpu()
+        if amd:
+            gpu_name = amd["name"]
+            gpu_count = amd["count"]
+            gpu_vram_gb = amd["vram_gb"]
+            driver_version = amd["driver"]
 
     return HardwareInfo(
         os=os_name,
