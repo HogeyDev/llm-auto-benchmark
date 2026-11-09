@@ -30,14 +30,12 @@ class InferenceGateway:
         self.checkpoint_store = checkpoint_store
         self.task_id: Optional[str] = None
         self.dataset_revision = "official"
-        self.reused_prompts = set()
         self.reused_calls = 0
 
     def set_task_context(self, task_id: str, dataset_revision: str = "official") -> None:
         """Set the current benchmark provenance used by replay keying."""
         self.task_id = task_id
         self.dataset_revision = dataset_revision
-        self.reused_prompts = set()
 
     def _checkpoint_key(self, mode: str, payload: Dict[str, Any]) -> Optional[str]:
         if self.checkpoint_store is None or self.task_id is None:
@@ -45,6 +43,10 @@ class InferenceGateway:
         return self.checkpoint_store.make_key(
             model_id=self.checkpoint_store.model_id,
             quantization=self.checkpoint_store.quantization,
+            backend=self.checkpoint_store.backend,
+            backend_version=self.checkpoint_store.backend_version,
+            reasoning_effort=self.checkpoint_store.reasoning_effort,
+            server=self.checkpoint_store.server,
             evaluator_version=self.checkpoint_store.evaluator_version,
             task_id=self.task_id,
             dataset_revision=self.dataset_revision,
@@ -65,6 +67,10 @@ class InferenceGateway:
             "key": key,
             "model_id": self.checkpoint_store.model_id,
             "quantization": self.checkpoint_store.quantization,
+            "backend": self.checkpoint_store.backend,
+            "backend_version": self.checkpoint_store.backend_version,
+            "reasoning_effort": self.checkpoint_store.reasoning_effort,
+            "server": self.checkpoint_store.server,
             "evaluator_version": self.checkpoint_store.evaluator_version,
             "task_id": self.task_id,
             "dataset_revision": self.dataset_revision,
@@ -106,15 +112,10 @@ class InferenceGateway:
             if cached is not None:
                 self.checkpoint_store.hits += 1
                 self.reused_calls += 1
-                last_user = next(
-                    (m.get("content", "") for m in reversed(messages) if m.get("role") == "user"),
-                    "",
-                )
-                self.reused_prompts.add(last_user)
                 return GenerationResult(
                     cached.get("response", ""),
                     latency_ms=0.0,
-                    tokens_generated=int(cached.get("tokens_generated", 0)),
+                    tokens_generated=0,
                     reused=True,
                 )
 
@@ -196,11 +197,10 @@ class InferenceGateway:
             if cached is not None:
                 self.checkpoint_store.hits += 1
                 self.reused_calls += 1
-                self.reused_prompts.add(prompt)
                 return GenerationResult(
                     cached.get("response", ""),
                     latency_ms=0.0,
-                    tokens_generated=int(cached.get("tokens_generated", 0)),
+                    tokens_generated=0,
                     reused=True,
                 )
 

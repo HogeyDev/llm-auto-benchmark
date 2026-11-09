@@ -17,7 +17,7 @@ from ..models.schema import BenchmarkResult, TaskMetric, CategoryScore, ModelMet
 from .base import BaseBenchmarkTask
 from .registry import get_task, get_profile_tasks, BENCHMARK_REGISTRY
 from ..datasets.manager import BENCHMARK_DATASET_META
-from ..execution.checkpoint import CheckpointStore
+from ..execution.checkpoint import CheckpointStore, EVALUATOR_VERSION
 from ..utils.logger import console, logger
 
 
@@ -57,15 +57,11 @@ class BenchmarkSuite:
         return resolved
 
     @staticmethod
-    def _mark_reused_questions(metric: TaskMetric, gateway: InferenceGateway) -> None:
-        """Flag question results served from the replay checkpoint."""
-        if not gateway.reused_prompts or not metric.question_results:
+    def _count_reused_questions(metric: TaskMetric) -> None:
+        """Record how many question results were served from the replay checkpoint."""
+        if not metric.question_results:
             return
-        count = 0
-        for result in metric.question_results:
-            if result.raw_prompt in gateway.reused_prompts:
-                result.reused = True
-                count += 1
+        count = sum(1 for result in metric.question_results if result.reused)
         if count:
             metric.sub_metrics["reused_samples"] = count
 
@@ -108,6 +104,10 @@ class BenchmarkSuite:
                 checkpoint_path,
                 model_id=model_meta.model_id,
                 quantization=model_meta.quantization,
+                backend=model_meta.backend,
+                backend_version=model_meta.backend_version,
+                reasoning_effort=model_meta.reasoning_effort,
+                server=getattr(backend, "endpoint_url", ""),
             )
         gateway = InferenceGateway(
             backend=backend,
@@ -159,7 +159,7 @@ class BenchmarkSuite:
                         ci_l, ci_u = wilson_score_interval(metric.passed_samples, metric.total_samples)
                         metric.ci_lower = ci_l
                         metric.ci_upper = ci_u
-                    self._mark_reused_questions(metric, gateway)
+                    self._count_reused_questions(metric)
 
                     if cancel_event and cancel_event.is_set():
                         raise InterruptedError("Benchmark cancelled by user.")
@@ -189,7 +189,7 @@ class BenchmarkSuite:
                     ci_l, ci_u = wilson_score_interval(metric.passed_samples, metric.total_samples)
                     metric.ci_lower = ci_l
                     metric.ci_upper = ci_u
-                self._mark_reused_questions(metric, gateway)
+                self._count_reused_questions(metric)
 
                 if cancel_event and cancel_event.is_set():
                     raise InterruptedError("Benchmark cancelled by user.")
@@ -214,16 +214,19 @@ class BenchmarkSuite:
         # 2. Performance Telemetry & Efficiency Index
         telemetry_summary = collector.get_aggregate_summary()
         avg_tps = telemetry_summary.get("avg_decode_tokens_per_sec")
-        if not avg_tps and task_metrics:
+        if not avg_tps and task_metrics and not gateway.reused_calls:
             valid_tps = [m.avg_tokens_per_sec for m in task_metrics.values() if m.avg_tokens_per_sec]
             avg_tps = (sum(valid_tps) / len(valid_tps)) if valid_tps else 0.0
 
-        local_efficiency = engine.compute_local_efficiency_index(
-            slm_index=slm_index,
-            avg_tokens_per_sec=avg_tps,
-            model_ram_gb=model_meta.model_ram_gb or hardware_info.model_ram_gb,
-            peak_vram_gb=telemetry_summary.get("peak_vram_mb", 0.0) / 1024.0 if telemetry_summary.get("peak_vram_mb") else None,
-        )
+        if gateway.reused_calls and not telemetry_summary.get("total_calls"):
+            local_efficiency = None
+        else:
+            local_efficiency = engine.compute_local_efficiency_index(
+                slm_index=slm_index,
+                avg_tokens_per_sec=avg_tps,
+                model_ram_gb=model_meta.model_ram_gb or hardware_info.model_ram_gb,
+                peak_vram_gb=telemetry_summary.get("peak_vram_mb", 0.0) / 1024.0 if telemetry_summary.get("peak_vram_mb") else None,
+            )
 
         eval_id = str(uuid.uuid4())
         logger.info(
@@ -256,7 +259,7 @@ class BenchmarkSuite:
             provenance={
                 "profile": profile,
                 "benchmark_count": len(task_metrics),
-                "evaluator_version": "2.0.0",
+                "evaluator_version": EVALUATOR_VERSION,
                 "telemetry": telemetry_summary,
                 "dataset_provenance": {
                     tid: BENCHMARK_DATASET_META.get(tid, {}) for tid in task_metrics.keys()
