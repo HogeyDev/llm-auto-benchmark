@@ -233,3 +233,52 @@ def test_get_hardware_info_does_not_probe_amd_when_nvidia_found(monkeypatch):
     monkeypatch.setattr(hardware, "_detect_amd_gpu", lambda: pytest.fail("AMD probe must not run"))
     hw = hardware.get_hardware_info()
     assert hw.gpu_name == "NVIDIA GeForce RTX 5070 Ti"
+
+
+def test_parse_windows_video_controllers_keeps_amd_only():
+    import json
+    from slm_bench.models.hardware import _parse_windows_video_controllers
+
+    payload = json.dumps([
+        {"Name": "AMD Radeon RX 9060 XT", "DriverVersion": "31.0.12027.9001",
+         "AdapterRAM": 4293918720, "PNPDeviceID": r"PCI\VEN_1002&DEV_7590&SUBSYS_00000000"},
+        {"Name": "Microsoft Basic Display Adapter", "DriverVersion": "10.0.19041.1",
+         "AdapterRAM": 0, "PNPDeviceID": r"PCI\VEN_1002&DEV_0000"},
+        {"Name": "Intel(R) UHD Graphics 770", "DriverVersion": "31.0.101.4502",
+         "AdapterRAM": 1073741824, "PNPDeviceID": r"PCI\VEN_8086&DEV_4680"},
+    ])
+    devices = _parse_windows_video_controllers(payload)
+    assert devices == [{"name": "AMD Radeon RX 9060 XT", "driver": "31.0.12027.9001", "adapter_ram": 4293918720}]
+
+
+def test_parse_windows_video_controllers_accepts_single_object():
+    import json
+    from slm_bench.models.hardware import _parse_windows_video_controllers
+
+    payload = json.dumps({"Name": "AMD Radeon RX 7900 XTX", "DriverVersion": "31.0.1",
+                          "AdapterRAM": 0, "PNPDeviceID": r"PCI\VEN_1002&DEV_744C"})
+    assert [d["name"] for d in _parse_windows_video_controllers(payload)] == ["AMD Radeon RX 7900 XTX"]
+
+
+def test_choose_windows_vram_prefers_registry_and_rejects_wrapped_adapter_ram():
+    from slm_bench.models.hardware import _choose_windows_vram
+
+    assert _choose_windows_vram(17095983104, 4293918720) == 15.92
+    assert _choose_windows_vram(None, 4293918720) is None
+    assert _choose_windows_vram(None, 2147483648) == 2.0
+    assert _choose_windows_vram(None, None) is None
+
+
+def test_windows_parser_ignores_malformed_output():
+    from slm_bench.models.hardware import _parse_windows_video_controllers
+
+    assert _parse_windows_video_controllers("not json") == []
+    assert _parse_windows_video_controllers("") == []
+
+
+def test_detect_amd_gpu_dispatches_windows(monkeypatch):
+    import slm_bench.models.hardware as hardware
+
+    monkeypatch.setattr(hardware.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(hardware, "_detect_amd_windows", lambda: {"name": "AMD Radeon RX 9060 XT", "count": 1, "vram_gb": 15.92, "driver": "31.0.12027.9001"})
+    assert hardware._detect_amd_gpu()["name"] == "AMD Radeon RX 9060 XT"

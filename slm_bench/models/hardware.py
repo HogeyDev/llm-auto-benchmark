@@ -6,6 +6,7 @@ import platform
 import psutil
 import subprocess
 import re
+import json
 from pathlib import Path
 from typing import Optional
 from .schema import HardwareInfo
@@ -235,10 +236,126 @@ def _detect_amd_linux() -> Optional[dict]:
     }
 
 
+def _parse_windows_video_controllers(text: str) -> list:
+    """Extract AMD adapters from ``Win32_VideoController`` JSON."""
+    try:
+        payload = json.loads(text)
+    except (TypeError, ValueError):
+        return []
+    if isinstance(payload, dict):
+        payload = [payload]
+    if not isinstance(payload, list):
+        return []
+
+    devices = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("Name") or "").strip()
+        if not name:
+            continue
+        lowered = name.lower()
+        if any(token in lowered for token in ("microsoft basic", "remote", "virtual")):
+            continue
+        pnp_id = str(item.get("PNPDeviceID") or "").upper()
+        if "VEN_1002" not in pnp_id and "radeon" not in lowered and "amd" not in lowered:
+            continue
+        adapter_ram = item.get("AdapterRAM")
+        try:
+            adapter_ram = int(adapter_ram) if adapter_ram is not None else None
+        except (TypeError, ValueError):
+            adapter_ram = None
+        driver = item.get("DriverVersion")
+        devices.append({
+            "name": name,
+            "driver": str(driver) if driver else None,
+            "adapter_ram": adapter_ram,
+        })
+    return devices
+
+
+def _choose_windows_vram(qw_memory_size: Optional[int], adapter_ram: Optional[int]) -> Optional[float]:
+    """Prefer the 64-bit registry value; ignore AdapterRAM's 4 GiB wrap."""
+    if isinstance(qw_memory_size, int) and qw_memory_size > 0:
+        return round(qw_memory_size / (1024 ** 3), 2)
+    wrapped_threshold = 4 * 1024 ** 3 - 16 * 1024 ** 2
+    if isinstance(adapter_ram, int) and 0 < adapter_ram < wrapped_threshold:
+        return round(adapter_ram / (1024 ** 3), 2)
+    return None
+
+
+def _windows_registry_vram(device_desc: str) -> Optional[int]:
+    """Read ``HardwareInformation.qwMemorySize`` for a matching display adapter."""
+    try:
+        import winreg
+
+        class_path = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, class_path) as class_key:
+            index = 0
+            while True:
+                try:
+                    subkey_name = winreg.EnumKey(class_key, index)
+                except OSError:
+                    break
+                index += 1
+                try:
+                    with winreg.OpenKey(class_key, subkey_name) as subkey:
+                        try:
+                            desc, _ = winreg.QueryValueEx(subkey, "DriverDesc")
+                        except OSError:
+                            continue
+                        if str(desc).strip().lower() != device_desc.strip().lower():
+                            continue
+                        value, _ = winreg.QueryValueEx(subkey, "HardwareInformation.qwMemorySize")
+                        return int(value)
+                except OSError:
+                    continue
+    except Exception:
+        return None
+    return None
+
+
+def _detect_amd_windows() -> Optional[dict]:
+    """Detect an AMD GPU on Windows via CIM and the display-driver registry."""
+    try:
+        proc = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion,AdapterRAM,PNPDeviceID | ConvertTo-Json -Compress",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+    except Exception:
+        return None
+    if proc.returncode != 0 or not proc.stdout:
+        return None
+
+    devices = _parse_windows_video_controllers(proc.stdout)
+    if not devices:
+        return None
+
+    first = devices[0]
+    return {
+        "name": first["name"],
+        "count": len(devices),
+        "vram_gb": _choose_windows_vram(_windows_registry_vram(first["name"]), first["adapter_ram"]),
+        "driver": first["driver"],
+    }
+
+
 def _detect_amd_gpu() -> Optional[dict]:
     """Detect an AMD GPU on supported platforms; None when nothing is found."""
-    if platform.system() == "Linux":
+    system = platform.system()
+    if system == "Linux":
         return _detect_amd_linux()
+    if system == "Windows":
+        return _detect_amd_windows()
     return None
 
 
