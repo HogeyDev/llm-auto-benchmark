@@ -21,6 +21,15 @@ class InferenceGateway:
         self.backend = backend
         self.collector = collector or PerformanceCollector()
         self.capabilities = self._detect_capabilities()
+        self.task_id: Optional[str] = None
+        self.dataset_revision = "official"
+
+    def set_task_context(self, task_id: str, dataset_revision: str = "official") -> None:
+        """Set the current benchmark task, used by per-task adaptive token budgets."""
+        self.task_id = task_id
+        self.dataset_revision = dataset_revision
+        if hasattr(self.backend, "current_task_id"):
+            self.backend.current_task_id = task_id
 
     def _detect_capabilities(self) -> Dict[str, bool]:
         """Inspect backend capabilities (tools, logprobs, streaming)."""
