@@ -129,6 +129,55 @@ def test_small_profile_applies_sample_limit():
         assert metric.total_samples == 25
 
 
+def test_explicit_sample_limit_overrides_profile_default():
+    suite = BenchmarkSuite()
+    backend = MockInferenceBackend("test/model")
+    backend.load()
+    meta = ModelMetadata(
+        model_id="test/model-3B",
+        model_slug="model-3B-BF16",
+        param_count_b=3.0,
+        param_tier="3B-8B",
+        backend="mock",
+    )
+    hw = HardwareInfo(os="Linux", cpu="Xeon", cpu_cores=8, total_ram_gb=16.0)
+
+    result = suite.run_suite(
+        backend, meta, hw, profile="small", sample_limit=3, show_progress=False
+    )
+
+    assert result.status == "PARTIAL"
+    for metric in result.tasks.values():
+        assert metric.total_samples == 3
+
+
+def test_custom_task_selection_does_not_inherit_profile_limit():
+    suite = BenchmarkSuite()
+    backend = MockInferenceBackend("test/model")
+    backend.load()
+    meta = ModelMetadata(
+        model_id="test/model-3B",
+        model_slug="model-3B-BF16",
+        param_count_b=3.0,
+        param_tier="3B-8B",
+        backend="mock",
+    )
+    hw = HardwareInfo(os="Linux", cpu="Xeon", cpu_cores=8, total_ram_gb=16.0)
+
+    result = suite.run_suite(
+        backend,
+        meta,
+        hw,
+        selected_tasks=["gpqa_diamond"],
+        profile=None,
+        show_progress=False,
+    )
+
+    assert list(result.tasks) == ["gpqa_diamond"]
+    assert result.tasks["gpqa_diamond"].total_samples == 198
+    assert result.status == "FULL"
+
+
 def test_deterministic_stratified_sampling():
     dm = DatasetManager()
     dummy_data = [

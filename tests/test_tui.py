@@ -88,6 +88,20 @@ def test_tui_profile_selection():
     asyncio.run(_test())
 
 
+def test_tui_profile_select_offers_small_and_medium():
+    """Verify the TUI profile selector accepts the new sampled tiers."""
+    async def _test():
+        app = SLMBenchTUI()
+        async with app.run_test() as pilot:
+            profile_sel = app.query_one("#select-profile", Select)
+            for value in ("small", "medium"):
+                profile_sel.value = value
+                await pilot.pause()
+                assert app.query_one("#select-profile", Select).value == value
+
+    asyncio.run(_test())
+
+
 def test_tui_custom_profile_shows_official_tasks():
     """Verify the custom profile reveals only the official benchmark task controls."""
     async def _test():
