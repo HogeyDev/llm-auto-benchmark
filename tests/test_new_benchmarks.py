@@ -5,18 +5,20 @@ sampling is deterministic and reproducible, and leaderboard eligibility is stric
 """
 
 import pytest
-from slm_bench.backends.mock_backend import MockInferenceBackend
 from slm_bench.benchmarks.registry import (
     get_task,
     list_available_tasks,
     get_profile_tasks,
+    get_profile_sample_limit,
     BENCHMARK_REGISTRY,
     EVALUATION_PROFILES,
 )
+from slm_bench.benchmarks.suite import BenchmarkSuite
+from slm_bench.backends.mock_backend import MockInferenceBackend
+from slm_bench.models.schema import TaskMetric, ModelMetadata, HardwareInfo
 from slm_bench.datasets.manager import DatasetManager, BENCHMARK_DATASET_META
 from slm_bench.metrics.confidence import wilson_score_interval, compute_metric_confidence
 from slm_bench.scoring.scoring_engine import ScoringEngine
-from slm_bench.models.schema import TaskMetric
 
 
 def test_custom_slm_benchmarks_completely_removed():
@@ -54,6 +56,8 @@ def test_official_benchmarks_registered():
 
 def test_evaluation_profiles():
     quick = get_profile_tasks("quick")
+    small = get_profile_tasks("small")
+    medium = get_profile_tasks("medium")
     standard = get_profile_tasks("standard")
     extended = get_profile_tasks("extended")
 
@@ -63,11 +67,66 @@ def test_evaluation_profiles():
 
     assert "bbh" in standard
     assert len(standard) > len(quick)
+    assert small == standard
+    assert medium == standard
 
     assert "evalplus" in extended
     assert "bfcl" in extended
     assert "xstest" in extended
     assert len(extended) > len(standard)
+
+
+def test_profile_sample_limits():
+    assert get_profile_sample_limit("quick") == 5
+    assert get_profile_sample_limit("small") == 25
+    assert get_profile_sample_limit("medium") == 100
+    assert get_profile_sample_limit("standard") is None
+    assert get_profile_sample_limit("extended") is None
+    assert get_profile_sample_limit(None) is None
+
+
+def test_small_and_medium_are_partial_and_ineligible():
+    engine = ScoringEngine()
+    metric = TaskMetric(
+        task_id="mmlu_pro",
+        category="reasoning",
+        status="FULL",
+        raw_score=0.8,
+        normalized_score=80.0,
+        total_samples=100,
+        passed_samples=80,
+    )
+
+    for profile in ("small", "medium"):
+        status, eligible = engine.determine_run_status_and_eligibility(
+            task_metrics={"mmlu_pro": metric},
+            profile=profile,
+        )
+        assert status == "PARTIAL"
+        assert eligible is False
+
+
+def test_small_profile_applies_sample_limit():
+    suite = BenchmarkSuite()
+    backend = MockInferenceBackend("test/model")
+    backend.load()
+    meta = ModelMetadata(
+        model_id="test/model-3B",
+        model_slug="model-3B-BF16",
+        param_count_b=3.0,
+        param_tier="3B-8B",
+        backend="mock",
+    )
+    hw = HardwareInfo(os="Linux", cpu="Xeon", cpu_cores=8, total_ram_gb=16.0)
+
+    result = suite.run_suite(backend, meta, hw, profile="small", show_progress=False)
+
+    assert result.profile == "small"
+    assert result.status == "PARTIAL"
+    assert result.eligible_for_leaderboard is False
+    assert len(result.tasks) == 6
+    for metric in result.tasks.values():
+        assert metric.total_samples == 25
 
 
 def test_deterministic_stratified_sampling():

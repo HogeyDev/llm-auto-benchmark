@@ -15,7 +15,7 @@ from ..metrics.confidence import wilson_score_interval
 from ..scoring.scoring_engine import ScoringEngine, DEFAULT_CATEGORY_WEIGHTS, EXTENDED_CATEGORY_WEIGHTS
 from ..models.schema import BenchmarkResult, TaskMetric, CategoryScore, ModelMetadata, HardwareInfo
 from .base import BaseBenchmarkTask
-from .registry import get_task, get_profile_tasks, BENCHMARK_REGISTRY
+from .registry import get_task, get_profile_tasks, get_profile_sample_limit, BENCHMARK_REGISTRY
 from ..datasets.manager import BENCHMARK_DATASET_META
 from ..utils.logger import console, logger
 
@@ -77,8 +77,8 @@ class BenchmarkSuite:
         active_tasks = self.resolve_tasks(selected_tasks=selected_tasks, profile=profile)
 
         effective_sample_limit = sample_limit
-        if profile == "quick" and sample_limit is None:
-            effective_sample_limit = 5  # Deterministic quick profile smoke sample
+        if effective_sample_limit is None:
+            effective_sample_limit = get_profile_sample_limit(profile)
 
         logger.info(
             f"Starting official evaluation suite for [bold green]{model_meta.model_id}[/bold green] "

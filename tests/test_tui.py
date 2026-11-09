@@ -226,3 +226,12 @@ def test_tui_streaming_and_sample_logging():
 
     asyncio.run(_test())
 
+
+def test_tui_profile_labels_include_small_and_medium():
+    from slm_bench.tui import _profile_label
+
+    assert "PARTIAL" in _profile_label("small")
+    assert "PARTIAL" in _profile_label("medium")
+    assert "6 tasks" in _profile_label("small")
+    assert "6 tasks" in _profile_label("medium")
+

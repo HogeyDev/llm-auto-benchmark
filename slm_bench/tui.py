@@ -114,7 +114,7 @@ OFFICIAL_TASK_OPTIONS = [
 
 def _profile_label(profile: str) -> str:
     tasks = EVALUATION_PROFILES.get(profile, [])
-    mode = "PARTIAL" if profile == "quick" else "FULL"
+    mode = "PARTIAL" if profile in ("quick", "small", "medium") else "FULL"
     return f"{profile.capitalize()} ({len(tasks)} tasks - {mode})"
 
 
@@ -528,8 +528,10 @@ class SLMBenchTUI(App):
                 yield Label("Evaluation Profile:", classes="section-label")
                 yield Select(
                     [
-                        (_profile_label("standard"), "standard"),
                         (_profile_label("quick"), "quick"),
+                        (_profile_label("small"), "small"),
+                        (_profile_label("medium"), "medium"),
+                        (_profile_label("standard"), "standard"),
                         (_profile_label("extended"), "extended"),
                         ("Custom (Choose Official Tasks)", "custom"),
                     ],

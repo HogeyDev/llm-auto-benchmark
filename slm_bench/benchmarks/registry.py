@@ -66,6 +66,15 @@ TASK_ALIASES: Dict[str, str] = {
 }
 
 # Evaluation Profiles
+_STANDARD_TASKS: List[str] = [
+    "mmlu_pro",
+    "gpqa_diamond",
+    "bbh",
+    "gsm8k",
+    "math500",
+    "ifeval",
+]
+
 EVALUATION_PROFILES: Dict[str, List[str]] = {
     # Quick: development & smoke testing only. Uses seeded samples, marked PARTIAL.
     "quick": [
@@ -75,28 +84,28 @@ EVALUATION_PROFILES: Dict[str, List[str]] = {
         "math500",
         "ifeval",
     ],
+    # Small: 25 samples per standard task. Rough sanity check, marked PARTIAL.
+    "small": list(_STANDARD_TASKS),
+    # Medium: 100 samples per standard task. Pre-flight smell test, marked PARTIAL.
+    "medium": list(_STANDARD_TASKS),
     # Standard: complete official datasets for core reasoning, math, and instruction benchmarks.
-    "standard": [
-        "mmlu_pro",
-        "gpqa_diamond",
-        "bbh",
-        "gsm8k",
-        "math500",
-        "ifeval",
-    ],
+    "standard": list(_STANDARD_TASKS),
     # Extended: complete official suite including coding, tools, long-context, and safety.
-    "extended": [
-        "mmlu_pro",
-        "gpqa_diamond",
-        "bbh",
-        "gsm8k",
-        "math500",
-        "ifeval",
+    "extended": _STANDARD_TASKS + [
         "evalplus",
         "bfcl",
         "ruler",
         "xstest",
     ],
+}
+
+# Per-task sample limits for sampled profiles. None means the full official split.
+PROFILE_SAMPLE_LIMITS: Dict[str, Optional[int]] = {
+    "quick": 5,
+    "small": 25,
+    "medium": 100,
+    "standard": None,
+    "extended": None,
 }
 
 
@@ -128,3 +137,10 @@ def get_profile_tasks(profile_name: str) -> List[str]:
     if p_lower not in EVALUATION_PROFILES:
         raise ValueError(f"Unknown evaluation profile '{profile_name}'. Available: {list(EVALUATION_PROFILES.keys())}")
     return EVALUATION_PROFILES[p_lower]
+
+
+def get_profile_sample_limit(profile_name: Optional[str]) -> Optional[int]:
+    """Return the per-task sample limit for a profile, or None for a full split."""
+    if not profile_name:
+        return None
+    return PROFILE_SAMPLE_LIMITS.get(profile_name.lower().strip())
