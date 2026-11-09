@@ -17,6 +17,7 @@ from ..models.schema import BenchmarkResult, TaskMetric, CategoryScore, ModelMet
 from .base import BaseBenchmarkTask
 from .registry import get_task, get_profile_tasks, BENCHMARK_REGISTRY
 from ..datasets.manager import BENCHMARK_DATASET_META
+from ..execution.checkpoint import CheckpointStore
 from ..utils.logger import console, logger
 
 
@@ -55,6 +56,19 @@ class BenchmarkSuite:
                 logger.warning(f"Could not load official task '{tid}' for profile '{profile_name}': {e}")
         return resolved
 
+    @staticmethod
+    def _mark_reused_questions(metric: TaskMetric, gateway: InferenceGateway) -> None:
+        """Flag question results served from the replay checkpoint."""
+        if not gateway.reused_prompts or not metric.question_results:
+            return
+        count = 0
+        for result in metric.question_results:
+            if result.raw_prompt in gateway.reused_prompts:
+                result.reused = True
+                count += 1
+        if count:
+            metric.sub_metrics["reused_samples"] = count
+
     def run_suite(
         self,
         backend: BaseInferenceBackend,
@@ -70,6 +84,7 @@ class BenchmarkSuite:
         show_progress: bool = True,
         cancel_event: Optional[Any] = None,
         seed: int = 42,
+        checkpoint_path: Optional[str] = None,
     ) -> BenchmarkResult:
         """
         Execute evaluation suite and return standardized BenchmarkResult (Schema 2.0.0).
@@ -87,7 +102,18 @@ class BenchmarkSuite:
 
         # Wrap backend in InferenceGateway with PerformanceCollector
         collector = PerformanceCollector()
-        gateway = InferenceGateway(backend=backend, collector=collector)
+        checkpoint_store = None
+        if checkpoint_path:
+            checkpoint_store = CheckpointStore(
+                checkpoint_path,
+                model_id=model_meta.model_id,
+                quantization=model_meta.quantization,
+            )
+        gateway = InferenceGateway(
+            backend=backend,
+            collector=collector,
+            checkpoint_store=checkpoint_store,
+        )
 
         task_metrics: Dict[str, TaskMetric] = {}
 
@@ -106,8 +132,10 @@ class BenchmarkSuite:
                         raise InterruptedError("Benchmark cancelled by user.")
                     if on_task_start:
                         on_task_start(task.task_id, task.category)
-
-                    # Log official benchmark provenance details
+                    gateway.set_task_context(
+                        task.task_id,
+                        BENCHMARK_DATASET_META.get(task.task_id, {}).get("revision", "official"),
+                    )
                     meta = BENCHMARK_DATASET_META.get(task.task_id, {})
                     ds_name = meta.get("name", task.task_id)
                     ds_split = meta.get("split", "test")
@@ -131,6 +159,7 @@ class BenchmarkSuite:
                         ci_l, ci_u = wilson_score_interval(metric.passed_samples, metric.total_samples)
                         metric.ci_lower = ci_l
                         metric.ci_upper = ci_u
+                    self._mark_reused_questions(metric, gateway)
 
                     if cancel_event and cancel_event.is_set():
                         raise InterruptedError("Benchmark cancelled by user.")
@@ -144,6 +173,10 @@ class BenchmarkSuite:
                     raise InterruptedError("Benchmark cancelled by user.")
                 if on_task_start:
                     on_task_start(task.task_id, task.category)
+                gateway.set_task_context(
+                    task.task_id,
+                    BENCHMARK_DATASET_META.get(task.task_id, {}).get("revision", "official"),
+                )
 
                 metric = task.run(
                     gateway,
@@ -156,6 +189,7 @@ class BenchmarkSuite:
                     ci_l, ci_u = wilson_score_interval(metric.passed_samples, metric.total_samples)
                     metric.ci_lower = ci_l
                     metric.ci_upper = ci_u
+                self._mark_reused_questions(metric, gateway)
 
                 if cancel_event and cancel_event.is_set():
                     raise InterruptedError("Benchmark cancelled by user.")
@@ -197,6 +231,12 @@ class BenchmarkSuite:
             f"Aggregate SLM-Index: [bold yellow]{slm_index}%[/bold yellow]"
         )
 
+        total_reused = sum(
+            metric.sub_metrics.get("reused_samples", 0) for metric in task_metrics.values()
+        )
+        if checkpoint_store is not None:
+            checkpoint_store.close()
+
         return BenchmarkResult(
             schema_version="2.0.0",
             evaluation_id=eval_id,
@@ -221,5 +261,14 @@ class BenchmarkSuite:
                 "dataset_provenance": {
                     tid: BENCHMARK_DATASET_META.get(tid, {}) for tid in task_metrics.keys()
                 },
+                "checkpoint": (
+                    {
+                        "path": str(checkpoint_path),
+                        "loaded_entries": checkpoint_store.loaded,
+                        "reused_calls": gateway.reused_calls,
+                    }
+                    if checkpoint_store is not None else None
+                ),
+                "reused_samples": total_reused,
             },
         )
