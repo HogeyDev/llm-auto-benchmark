@@ -129,34 +129,61 @@ def generate_auto_system_notes(
 
 
 def _parse_vulkaninfo_devices(text: str) -> list:
-    """Extract device name and driver from ``vulkaninfo --summary`` output."""
+    """Extract device name, vendor, type, and driver from ``vulkaninfo --summary``."""
     devices = []
     current = None
+
+    def new_device():
+        return {"name": None, "driver": None, "vendor_id": None, "device_type": None}
+
     for raw_line in text.splitlines():
         line = raw_line.strip()
+        if re.match(r"^GPU\d+:$", line):
+            if current and current["name"]:
+                devices.append(current)
+            current = new_device()
+            continue
         key, separator, value = line.partition("=")
         if not separator:
             continue
         key = key.strip()
         value = value.strip()
+        if key not in ("deviceName", "driverInfo", "vendorID", "deviceType"):
+            continue
+        if current is not None and current["name"] and key in ("deviceName", "vendorID", "deviceType"):
+            devices.append(current)
+            current = new_device()
+        if current is None:
+            current = new_device()
         if key == "deviceName":
-            if current and current["name"]:
-                devices.append(current)
-            current = {"name": value, "driver": None}
-        elif key == "driverInfo" and current is not None:
+            current["name"] = value
+        elif key == "driverInfo":
             current["driver"] = value or None
+        elif key == "vendorID":
+            current["vendor_id"] = value or None
+        elif key == "deviceType":
+            current["device_type"] = value or None
     if current and current["name"]:
         devices.append(current)
     return devices
 
 
 def _select_vulkan_device(devices: list) -> Optional[dict]:
-    """Pick the first hardware GPU, skipping CPU/software Vulkan devices."""
-    ignored = ("ryzen", "raphael", "cpu", "llvmpipe", "lavapipe")
-    for device in devices:
-        if not any(token in device["name"].lower() for token in ignored):
+    """Pick a hardware GPU: AMD only when vendor IDs are known, discrete first."""
+    candidates = devices
+    if any(device.get("vendor_id") for device in devices):
+        candidates = [d for d in devices if (d.get("vendor_id") or "").lower() == "0x1002"]
+        if not candidates:
+            return None
+    for device in candidates:
+        if (device.get("device_type") or "").upper() == "PHYSICAL_DEVICE_TYPE_DISCRETE_GPU":
             return device
-    return devices[0] if devices else None
+    ignored = ("ryzen", "raphael", "cpu", "llvmpipe", "lavapipe", "phoenix", "renoir", "vega")
+    for device in candidates:
+        name = (device.get("name") or "").lower()
+        if name and not any(token in name for token in ignored):
+            return device
+    return candidates[0] if candidates else None
 
 
 def _parse_sysfs_amd_cards(root: Path) -> list:
@@ -173,11 +200,15 @@ def _parse_sysfs_amd_cards(root: Path) -> list:
                 vram_bytes = 0
             cards.append({
                 "pci_slot": device_path.resolve().name,
-                "vram_gb": round(vram_bytes / (1024 ** 3), 2),
+                "vram_gb": round(vram_bytes / (1024 ** 3), 2) if vram_bytes > 0 else None,
             })
         except OSError:
             continue
-    return sorted(cards, key=lambda card: card["vram_gb"], reverse=True)
+    return sorted(
+        cards,
+        key=lambda card: (card["vram_gb"] is not None, card["vram_gb"] or 0.0),
+        reverse=True,
+    )
 
 
 def _parse_lspci_names(text: str) -> dict:
@@ -340,12 +371,19 @@ def _detect_amd_windows() -> Optional[dict]:
     if not devices:
         return None
 
-    first = devices[0]
+    best_device = None
+    best_vram = None
+    for device in devices:
+        vram = _choose_windows_vram(_windows_registry_vram(device["name"]), device["adapter_ram"])
+        if best_device is None or (vram is not None and (best_vram is None or vram > best_vram)):
+            best_device = device
+            best_vram = vram
+
     return {
-        "name": first["name"],
+        "name": best_device["name"],
         "count": len(devices),
-        "vram_gb": _choose_windows_vram(_windows_registry_vram(first["name"]), first["adapter_ram"]),
-        "driver": first["driver"],
+        "vram_gb": best_vram,
+        "driver": best_device["driver"],
     }
 
 
